@@ -17,7 +17,7 @@ from imautils.devices import FDI2056
 # from imautils.devices import pydrs
 
 from flipcoil.gui.utils import get_ui_file as _get_ui_file
-import flipcoil.data.configuration as _configuration
+# import flipcoil.data.configuration as _configuration
 from flipcoil.devices import (
     ppmac as _ppmac,
     fdi as _fdi,
@@ -37,7 +37,7 @@ class ConnectionWidget(_QWidget):
         uifile = _get_ui_file(self)
         self.ui = _uic.loadUi(uifile, self)
 
-        self.connection_config = _configuration.ConnectionConfig()
+#         self.connection_config = _configuration.ConnectionConfig()
 
         self.connect_signal_slots()
         self.update_serial_ports()
@@ -48,7 +48,7 @@ class ConnectionWidget(_QWidget):
         self.ui.pbt_connect.clicked.connect(self.connect)
 
     def update_serial_ports(self):
-            """Update avaliable serial ports."""
+            """Update available serial ports."""
             _l = [p[0] for p in _list_ports.comports()]
 
             if len(_l) == 0:

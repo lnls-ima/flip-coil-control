@@ -1,6 +1,7 @@
 """Main window for the Flip Coil Control application"""
 
 import sys as _sys
+import threading as _threading
 import traceback as _traceback
 from qtpy.QtWidgets import (
     QFileDialog as _QFileDialog,
@@ -70,6 +71,8 @@ class FlipCoilWindow(_QMainWindow):
 
         # connect signals and slots
 #         self.connect_signal_slots()
+
+        self.lock_ppmac = _threading.RLock()
 
         # add widgets to main tab
         self.ui.twg_main.clear()

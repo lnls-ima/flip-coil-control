@@ -50,6 +50,26 @@ class AnalysisWidget(_QWidget):
 
         self.connect_signal_slots()
 
+    @property
+    def database_name(self):
+        """Database name."""
+        return _QApplication.instance().database_name
+
+    @property
+    def mongo(self):
+        """MongoDB database."""
+        return _QApplication.instance().mongo
+
+    @property
+    def server(self):
+        """Server for MongoDB database."""
+        return _QApplication.instance().server
+
+    @property
+    def directory(self):
+        """Return the default directory."""
+        return _QApplication.instance().directory
+
     def connect_signal_slots(self):
         """Create signal/slot connections."""
         self.ui.cmb_plot.currentIndexChanged.connect(self.plot)
@@ -67,7 +87,7 @@ class AnalysisWidget(_QWidget):
 
     def plot(self):
         try:
-            _meas = self.parent_window.measurement
+            _meas = self.parent_window.measurement.meas
             self.canvas.axes.cla()
 
             if self.ui.cmb_plot.currentText() == 'Integrated Field Result':
@@ -103,7 +123,6 @@ class AnalysisWidget(_QWidget):
 
             elif self.ui.cmb_plot.currentText() == 'Forward Voltage':
                 for i in range(_meas.data_frw.shape[1]):
-                    print(str(i))
                     _color = 'C' + str(i)
                     self.canvas.axes.plot(_meas.data_frw[:, i], _color + '-',
                                           label=str(i))
@@ -159,12 +178,12 @@ class AnalysisWidget(_QWidget):
             self.canvas.figure.tight_layout()
             self.canvas.draw()
 
-            _result = '{:.2f} +/- {:.2f}'.format(_meas.Imeas.mean()*10**6,
-                                                 _meas.Imeas_err*10**6)
+            _result = '{:.2f} +/- {:.2f}'.format(_meas.I_mean*10**6,
+                                                 _meas.I_std*10**6)
             _result_f = '{:.2f} +/- {:.2f}'.format(_meas.If.mean()*10**6,
-                                                   _meas.If_err*10**6)
+                                                   _meas.If_std*10**6)
             _result_b = '{:.2f} +/- {:.2f}'.format(_meas.Ib.mean()*10**6,
-                                                   _meas.Ib_err*10**6)
+                                                   _meas.Ib_std*10**6)
             self.ui.le_result.setText(_result)
             self.ui.le_result_f.setText(_result_f)
             self.ui.le_result_b.setText(_result_b)

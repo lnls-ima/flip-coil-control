@@ -14,9 +14,10 @@ import qtpy.uic as _uic
 
 from flipcoil.gui.utils import get_ui_file as _get_ui_file
 
+
 class MeasurementDialog(_QDialog):
     """Flip Coil measurement progress dialog."""
-    
+
     def __init__(self, parent=None):
         """Set up the ui and create connections."""
         super().__init__(parent)

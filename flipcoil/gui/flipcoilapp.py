@@ -16,7 +16,6 @@ from flipcoil.devices import (
     ps as _ps,
     volt as _volt,
     )
-from flipcoil.data import cfg_ppmac
 
 
 class FlipCoilApp(_QApplication):
@@ -31,7 +30,7 @@ class FlipCoilApp(_QApplication):
         self.database_name = _utils.DATABASE_NAME
         self.mongo = _utils.MONGO
         self.server = _utils.SERVER
-#         self.create_database()
+        self.create_database()
 
         # positions dict
         self.positions = {}
@@ -48,17 +47,17 @@ class FlipCoilApp(_QApplication):
 
     def create_database(self):
         """Create database and tables."""
-        _ConnectionConfig = _data.configuration.ConnectionConfig(
-            database_name=self.database_name,
-            mongo=self.mongo, server=self.server)
-        _IntegratorConfig = (
-            _data.configuration.IntegratorConfig(
-                database_name=self.database_name,
-                mongo=self.mongo, server=self.server))
-        _PpmacConfig = (
-            _data.configuration.PpmacConfig(
-                database_name=self.database_name,
-                mongo=self.mongo, server=self.server))
+#         _ConnectionConfig = _data.configuration.ConnectionConfig(
+#             database_name=self.database_name,
+#             mongo=self.mongo, server=self.server)
+#         _IntegratorConfig = (
+#             _data.configuration.IntegratorConfig(
+#                 database_name=self.database_name,
+#                 mongo=self.mongo, server=self.server))
+#         _PpmacConfig = (
+#             _data.configuration.PpmacConfig(
+#                 database_name=self.database_name,
+#                 mongo=self.mongo, server=self.server))
 #         _PowerSupplyConfig = _data.configuration.PowerSupplyConfig(
 #             database_name=self.database_name,
 #             mongo=self.mongo, server=self.server)
@@ -73,11 +72,11 @@ class FlipCoilApp(_QApplication):
             mongo=self.mongo, server=self.server)
 
         status = []
-        status.append(_ConnectionConfig.db_create_collection())
+#         status.append(_ConnectionConfig.db_create_collection())
 #         status.append(_PowerSupplyConfig.db_create_collection())
 #         status.append(_CyclingCurve.db_create_collection())
+#         status.append(_IntegratorConfig.db_create_collection())
         status.append(_MeasurementConfig.db_create_collection())
-        status.append(_IntegratorConfig.db_create_collection())
         status.append(_MeasurementData.db_create_collection())
 
         if not all(status):

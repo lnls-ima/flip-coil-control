@@ -33,6 +33,10 @@ class PpmacWidget(_QWidget):
         uifile = _get_ui_file(self)
         self.ui = _uic.loadUi(uifile, self)
 
+        self.x_sf = 2e-8
+        self.y_sf = 2e-8
+        self.angular_sf = 1e-3
+
         self.timer = _QTimer()
         self.timer.start(1000)
 
@@ -49,25 +53,73 @@ class PpmacWidget(_QWidget):
             if hasattr(_ppmac, 'ppmac'):
                 if all([not _ppmac.ppmac.closed,
                         self.parent().currentWidget() == self]):
-                    self.pos = _ppmac.read_motor_pos([7, 8])
-                    self.ui.lcd_pos5.display(self.pos[0])
-                    _sleep(0.1)
-                    self.ui.lcd_pos6.display(self.pos[1])
+                    with self.parent_window.lock_ppmac:
+                        self.pos = _ppmac.read_motor_pos([1, 2, 3, 4, 7, 8])
+                    self.ui.lcd_pos1.display(self.pos[0]*self.x_sf)
+                    self.ui.lcd_pos1.display(self.pos[1]*self.y_sf)
+                    self.ui.lcd_pos1.display(self.pos[2]*self.x_sf)
+                    self.ui.lcd_pos1.display(self.pos[3]*self.y_sf)
+                    self.ui.lcd_pos5.display(self.pos[4]*self.angular_sf)
+                    self.ui.lcd_pos6.display(self.pos[5]*self.angular_sf)
                     _QApplication.processEvents()
         except Exception:
             _traceback.print_exc(file=_sys.stdout)
 
     def home(self):
         try:
-            print(self.parent().currentWidget() == self)
+            _home5 = -31860
+            _home6 = -21861
+            _ppmac.write('enable plc HomeA')
+            _sleep(30)
+        except Exception:
+            _traceback.print_exc(file=_sys.stdout)
+
+    def home_x(self):
+        try:
+            _ppmac.write('enable plc HomeX')
+            _sleep(30)
+        except Exception:
+            _traceback.print_exc(file=_sys.stdout)
+
+    def home_y(self):
+        try:
+            _ppmac.write('enable plc HomeY')
+            _sleep(30)
         except Exception:
             _traceback.print_exc(file=_sys.stdout)
 
     def move(self):
         try:
             _steps = [self.ui.sb_steps5.value(), self.ui.sb_steps6.value()]
+            if self.ui.rdb_abs.isChecked():
+                _mode = '='
+            else:
+                _mode = '^'
+            _ppmac.write('#5j' + _mode + str(_steps[0]) +
+                         ';#6j' + _mode + str(_steps[1]))
+        except Exception:
+            _traceback.print_exc(file=_sys.stdout)
 
-            _ppmac.write('#5j^' + str(_steps[0]) +
-                         ';#6j^' + str(_steps[1]))
+    def move_x(self):
+        try:
+            _pos = self.ui.dsb_x.value()/self.x_sf
+            if self.ui.rdb_abs_xy.isChecked():
+                _mode = '='
+            else:
+                _mode = '^'
+            _msg = '#1,3j' + _mode + str(_pos)
+            _ppmac.write(_msg)
+        except Exception:
+            _traceback.print_exc(file=_sys.stdout)
+
+    def move_y(self):
+        try:
+            _pos = self.ui.dsb_y.value()/self.y_sf
+            if self.ui.rdb_abs_xy.isChecked():
+                _mode = '='
+            else:
+                _mode = '^'
+            _msg = '#2,4j' + _mode + str(_pos)
+            _ppmac.write(_msg)
         except Exception:
             _traceback.print_exc(file=_sys.stdout)

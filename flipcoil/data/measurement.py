@@ -3,15 +3,8 @@
 import numpy as _np
 import collections as _collections
 import imautils.db.database as _database
-# measurement data
-    # flux forward
-    # flux backward
-    # flux mean
-    # I forward
-    # I backward
-    # I mean
-    # I std
-    # Motor positions
+
+
 class MeasurementData(_database.DatabaseAndFileDocument):
     """Read, write and store measurement results data."""
 
@@ -21,31 +14,32 @@ class MeasurementData(_database.DatabaseAndFileDocument):
         ('idn', {'field': 'id', 'dtype': int, 'not_null': True}),
         ('date', {'field': 'date', 'dtype': str, 'not_null': True}),
         ('hour', {'field': 'hour', 'dtype': str, 'not_null': True}),
-        ('software_version', 
+        ('software_version',
             {'field': 'software_version', 'dtype': str, 'not_null': False}),
-        ('I_mean', 
+        ('name',
+            {'field': 'name', 'dtype': str, 'not_null': True}),
+        ('comments',
+            {'field': 'comments', 'dtype': str, 'not_null': True}),
+        ('I_mean',
             {'field': 'I_mean', 'dtype': float, 'not_null': True}),
-        ('I_std', 
+        ('I_std',
             {'field': 'I_std', 'dtype': float, 'not_null': True}),
-        ('flux_frw', 
-            {'field': 'flux_frw', 'dtype': _np.ndarray, 'not_null': True}),
-        ('flux_bck', 
-            {'field': 'flux_bck', 'dtype': _np.ndarray, 'not_null': True}),
-        ('coil_width', 
-            {'field': 'coil_width', 'dtype': float, 'not_null': True}),
-        ('n_turns',
-            {'field': 'n_turns', 'dtype': float, 'not_null': True}),
-        ('inetegration_interval',
-            {'field': 'integration_interval', 'dtype': float, 'not_null': True}),
-        ('pos7_frw',
-            {'field': 'pos7_frw', 'dtype': _np.ndarray, 'not_null': True}),
-        ('pos8_frw',
-            {'field': 'pos8_frw', 'dtype': _np.ndarray, 'not_null': True}),
-        ('pos7_bck',
-            {'field': 'pos7_bck', 'dtype': _np.ndarray, 'not_null': True}),
-        ('pos8_bck', 
-            {'field': 'pos8_bck', 'dtype': _np.ndarray, 'not_null': True}),
-        #cfgs_ids!
+        ('data_frw',
+            {'field': 'data_frw', 'dtype': _np.ndarray, 'not_null': True}),
+        ('data_bck',
+            {'field': 'data_bck', 'dtype': _np.ndarray, 'not_null': True}),
+        ('pos7f',
+            {'field': 'pos7f', 'dtype': _np.ndarray, 'not_null': True}),
+        ('pos8f',
+            {'field': 'pos8f', 'dtype': _np.ndarray, 'not_null': True}),
+        ('pos7b',
+            {'field': 'pos7b', 'dtype': _np.ndarray, 'not_null': True}),
+        ('pos8b',
+            {'field': 'pos8b', 'dtype': _np.ndarray, 'not_null': True}),
+        ('cfg_id',
+            {'field': 'cfg_id', 'dtype': int, 'not_null': True}),
+        ('Iamb',
+            {'field': 'Iamb', 'dtype': int, 'not_null': True}),
     ])
 
     def __init__(
@@ -59,6 +53,6 @@ class MeasurementData(_database.DatabaseAndFileDocument):
             mongo (bool): flag indicating mongoDB (True) or sqlite (False).
             server (str): MongoDB server.
 
-        """       
+        """
         super().__init__(
             database_name=database_name, mongo=mongo, server=server)
