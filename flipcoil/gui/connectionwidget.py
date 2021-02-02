@@ -77,7 +77,7 @@ class ConnectionWidget(_QWidget):
             _agilent_addr = self.ui.sb_agilent_addr.value()
             _agilent_board = self.ui.sb_agilent_board.value()
             _ppmac.connect(_ppmac_ip)
-            _fdi.inst = _fdi.rm.open_resource(_fdi_inst.encode())
+#             _fdi.inst = _fdi.rm.open_resource(_fdi_inst.encode())
             _volt.connect(address=_agilent_addr, board=_agilent_board)
             _QMessageBox.information(self, 'Information',
                                      'Devices connected.',

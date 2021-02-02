@@ -14,6 +14,7 @@ from qtpy.QtWidgets import (
 from qtpy.QtCore import Qt as _Qt
 import qtpy.uic as _uic
 
+import flipcoil.data as _data
 from flipcoil.gui.utils import get_ui_file as _get_ui_file
 
 import matplotlib
@@ -48,6 +49,9 @@ class AnalysisWidget(_QWidget):
 
         self.set_pyplot()
 
+        self.cfg = _data.configuration.MeasurementConfig()
+        self.meas = _data.measurement.MeasurementData()
+
         self.connect_signal_slots()
 
     @property
@@ -73,9 +77,10 @@ class AnalysisWidget(_QWidget):
     def connect_signal_slots(self):
         """Create signal/slot connections."""
         self.ui.cmb_plot.currentIndexChanged.connect(self.plot)
-        self.ui.pbt_update.clicked.connect(self.plot)
+        self.ui.pbt_update.clicked.connect(self.update_meas_list)
 
     def set_pyplot(self):
+        """Configures plot widget"""
         self.canvas = MplCanvas(self, width=5, height=4, dpi=100)
         _toolbar = _NavigationToolbar(self.canvas, self)
 
@@ -85,11 +90,54 @@ class AnalysisWidget(_QWidget):
 
         self.wg_plot.setLayout(_layout)
 
+    def update_meas_list(self):
+        """Update measurement list in combobox."""
+        try:
+            self.meas.db_update_database(
+                database_name=self.database_name,
+                mongo=self.mongo, server=self.server)
+            names = self.meas.db_get_values('name')
+
+            current_text = self.ui.cmb_meas_name.currentText()
+            self.ui.cmb_meas_name.clear()
+            self.ui.cmb_meas_name.addItems([name for name in names])
+            if len(current_text) == 0:
+                self.ui.cmb_meas_name.setCurrentIndex(
+                    self.ui.cmb_meas_name.count()-1)
+            else:
+                self.ui.cmb_meas_name.setCurrentText(current_text)
+        except Exception:
+            _traceback.print_exc(file=_sys.stdout)
+
+    def load_measurement(self):
+        """Loads selected measurement from database."""
+        try:
+            pass
+#             self.parent_window.measurement.first_integral_calculus(
+#                 cfg=self.cfg, meas=self.meas)
+#             name = self.ui.cmb_cfg_name.currentText()
+#             self.cfg.db_update_database(
+#                 self.database_name,
+#                 mongo=self.mongo, server=self.server)
+#             _id = self.cfg.db_search_field('name', name)[0]['id']
+#             self.cfg.db_read(_id)
+#             self.load_cfg_on_ui()
+#             _QMessageBox.information(self, 'Information',
+#                                      'Configuration Loaded.',
+#                                      _QMessageBox.Ok)
+            return True
+        except Exception:
+            _QMessageBox.warning(self, 'Information',
+                                 'Failed to load this configuration.',
+                                 _QMessageBox.Ok)
+            _traceback.print_exc(file=_sys.stdout)
+            return False
+
     def plot(self):
         try:
             _meas = self.parent_window.measurement.meas
-            self.canvas.axes.cla()
 
+            self.canvas.axes.cla()
             if self.ui.cmb_plot.currentText() == 'Integrated Field Result':
                 for i in range(_meas.I.shape[1]):
                     self.canvas.axes.plot(_meas.I[:, i], label=str(i))

@@ -79,6 +79,7 @@ class MeasurementWidget(_QWidget):
         self.ui.pbt_update_cfg.clicked.connect(self.update_cfg_list)
 
     def save_log(self, array, name='', comments=''):
+        """Saves log on file."""
         name = name + _time.strftime('_%y_%m_%d_%H_%M', _time.localtime()) + '.dat'
         head = ('Turn1[V.s]\tTurn2[V.s]\tTurn3[V.s]\tTurn4[V.s]\tTurn5[V.s]\t' + 
                 'Turn6[V.s]\tTurn7[V.s]\tTurn8[V.s]\tTurn9[V.s]\tTurn10[V.s]')
@@ -86,6 +87,8 @@ class MeasurementWidget(_QWidget):
         _np.savetxt(name, array, delimiter='\t', comments=comments, header=head)
 
     def test_steps(self):
+        """Tests steps from ui values and prints initial and final positions.
+        """
         try:
             _start_pos = int(self.ui.dsp_start_pos.value()*10**3)
             _ppmac.remove_backlash(_start_pos)
@@ -107,6 +110,7 @@ class MeasurementWidget(_QWidget):
             _traceback.print_exc(file=_sys.stdout)
 
     def update_cfg_list(self):
+        """Updates configuration name list in combobox."""
         try:
             self.cfg.db_update_database(
                 database_name=self.database_name,
@@ -125,6 +129,7 @@ class MeasurementWidget(_QWidget):
             _traceback.print_exc(file=_sys.stdout)
 
     def update_cfg_from_ui(self):
+        """Updates current configuration from ui widgets."""
         try:
             self.cfg.name = self.ui.cmb_cfg_name.currentText()
 
@@ -196,6 +201,7 @@ class MeasurementWidget(_QWidget):
             return False
 
     def load_cfg_on_ui(self):
+        """Loads database configuration on ui widgets."""
         try:
             self.ui.cmb_cfg_name.setCurrentText(self.cfg.name)
 
@@ -224,19 +230,30 @@ class MeasurementWidget(_QWidget):
             _traceback.print_exc(file=_sys.stdout)
 
     def measure(self):
+        """Creates measurement dialog."""
         self.dialog = _MeasurementDialog()
         self.dialog.show()
         self.dialog.accepted.connect(self.measure_first_integral)
         self.dialog.rejected.connect(self.cancel_measurement)
 
     def cancel_measurement(self):
+        """Cancels measruement and destroys measurement dialog."""
         self.dialog.destroy()
 
     def measure_first_integral(self, fdi_mode=False):
+        """Runs first field integral measurement.
+
+        Returns:
+            True if successfull;
+            False otherwise.
+        """
         try:
-            self.meas.meas_name = self.dialog.ui.cmb_meas_name.currentText()
-            self.meas.Iamb = self.ui.chb_Iamb.isChecked()*1
-            self.meas.cfg_id = 0
+            self.update_cfg_from_ui()
+
+            self.meas.name = self.dialog.ui.cmb_meas_name.currentText()
+            self.meas.comments = self.dialog.ui.te_comments.toPlainText()
+            self.meas.Iamb = self.dialog.ui.chb_Iamb.isChecked()*1
+            self.meas.cfg_id = self.ui.cmb_cfg_name.currentIndex() + 1
 
             speed = self.cfg.speed*102.4  # [rev/s]
             start_pos = int(self.cfg.start_pos*10**3)
@@ -364,58 +381,88 @@ class MeasurementWidget(_QWidget):
                                      'Measurement Finished.',
                                      _QMessageBox.Ok)
 
-            self.first_integral_calculus(dt=self.cfg.nplc/60, fdi_mode=fdi_mode)
+            self.meas = self.first_integral_calculus(cfg=self.cfg,
+                                                     meas=self.meas)
+            self.save_measurement()
+            self.parent_window.analysis.update_meas_list()
             return True
 
         except Exception:
             _traceback.print_exc(file=_sys.stdout)
             return False
 
-    def first_integral_calculus(self, dt=2/60, fdi_mode=False):
-        # analysis
+    def first_integral_calculus(self, cfg, meas, fdi_mode=False):
+        """Calculates first field integral from raw data.
+
+        Args:
+            cfg (MeasurementConfig): measurement configuration;
+            meas (MeasurementData): measurement data.
+
+        Returns:
+            MeaseurementData instance if the calculations were successfull,
+            None otherwise
+        """
         try:
             # _width = 12.5e-3  # [m]
-            _width = self.cfg.width
-            _turns = self.cfg.turns  # number of coil turns
+            _width = cfg.width
+            _turns = cfg.turns  # number of coil turns
+            _dt = cfg.nplc/60
             # I = flux/(2*N*width)
             if not fdi_mode:
-                for i in range(self.meas.data_frw.shape[1]):
-                    _offset_f = self.meas.data_frw[:40, i].mean()
-                    _offset_b = self.meas.data_bck[:40, i].mean()
+                for i in range(meas.data_frw.shape[1]):
+                    _offset_f = meas.data_frw[:40, i].mean()
+                    _offset_b = meas.data_bck[:40, i].mean()
                     _f_f = _np.array([0])
                     _f_b = _np.array([0])
-                    for idx in range(self.meas.data_frw[:, i].shape[0]-1):
+                    for idx in range(meas.data_frw[:, i].shape[0]-1):
                         # dv = ((v[i+1] - v[i])/2)/0.05
                         # f = np.append(f, f[i]+dv)
-                        _f_f_part = self.meas.data_frw[:idx, i] - _offset_f
-                        _f_b_part = self.meas.data_bck[:idx, i] - _offset_b
-                        _f_f = _np.append(_f_f, _np.trapz(_f_f_part, dx=dt))
-                        _f_b = _np.append(_f_b, _np.trapz(_f_b_part, dx=dt))
+                        _f_f_part = meas.data_frw[:idx, i] - _offset_f
+                        _f_b_part = meas.data_bck[:idx, i] - _offset_b
+                        _f_f = _np.append(_f_f, _np.trapz(_f_f_part, dx=_dt))
+                        _f_b = _np.append(_f_b, _np.trapz(_f_b_part, dx=_dt))
                     if i == 0:
-                        self.meas.flx_f = _f_f
-                        self.meas.flx_b = _f_b
+                        meas.flx_f = _f_f
+                        meas.flx_b = _f_b
                     else:
-                        self.meas.flx_f = _np.vstack([self.meas.flx_f, _f_f])
-                        self.meas.flx_b = _np.vstack([self.meas.flx_b, _f_b])
-                self.meas.flx_f = self.meas.flx_f.transpose()
-                self.meas.flx_b = self.meas.flx_b.transpose()
+                        meas.flx_f = _np.vstack([meas.flx_f, _f_f])
+                        meas.flx_b = _np.vstack([meas.flx_b, _f_b])
+                meas.flx_f = meas.flx_f.transpose()
+                meas.flx_b = meas.flx_b.transpose()
             else:
-                self.meas.flx_f = _np.copy(self.meas.data_frw)
-                self.meas.flx_b = _np.copy(self.meas.data_bck)
+                meas.flx_f = _np.copy(meas.data_frw)
+                meas.flx_b = _np.copy(meas.data_bck)
 
-            self.meas.I_f = self.meas.flx_f * 1/(2*_turns*_width)
-            self.meas.I_b = self.meas.flx_b * 1/(2*_turns*_width)
-            self.meas.I = (self.meas.flx_f - self.meas.flx_b)/2 * 1/(2*_turns*_width)
+            meas.I_f = meas.flx_f * 1/(2*_turns*_width)
+            meas.I_b = meas.flx_b * 1/(2*_turns*_width)
+            meas.I = (meas.flx_f - meas.flx_b)/2 * 1/(2*_turns*_width)
 
-            self.meas.If = self.meas.I_f[61, :] - self.meas.I_f[40, :]
-            self.meas.If_std = self.meas.If.std()
+            meas.If = meas.I_f[61, :] - meas.I_f[40, :]
+            meas.If_std = meas.If.std()
 
-            self.meas.Ib = self.meas.I_b[61, :] - self.meas.I_b[40, :]
-            self.meas.Ib_std = self.meas.Ib.std()
+            meas.Ib = meas.I_b[61, :] - meas.I_b[40, :]
+            meas.Ib_std = meas.Ib.std()
 
-            self.meas.I_mean = self.meas.I[61, :] - self.meas.I[40, :]
-            self.meas.I_std = 1/2*(self.meas.If_std**2 + self.meas.Ib_std**2)**0.5
+            meas.I_mean = (meas.If.mean() - meas.Ib.mean())/2
+            meas.I_std = 1/2*(meas.If_std**2 + meas.Ib_std**2)**0.5
 
+            return meas
         except Exception:
+            _traceback.print_exc(file=_sys.stdout)
+            return None
+
+    def save_measurement(self):
+        """Saves current measurement into database."""
+        try:
+            self.meas.db_update_database(
+                        self.database_name,
+                        mongo=self.mongo, server=self.server)
+            self.meas.db_save()
+            self.parent_window.analysis.update_meas_list()
+            return True
+        except Exception:
+            _QMessageBox.warning(self, 'Information',
+                                 'Failed to save this measurement.',
+                                 _QMessageBox.Ok)
             _traceback.print_exc(file=_sys.stdout)
             return False
