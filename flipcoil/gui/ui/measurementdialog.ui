@@ -39,16 +39,39 @@
     </layout>
    </item>
    <item>
-    <layout class="QGridLayout" name="gridLayout">
-     <item row="0" column="0">
-      <widget class="QLabel" name="label_2">
+    <widget class="QLabel" name="label_2">
+     <property name="text">
+      <string>Comments:</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QTextEdit" name="te_comments"/>
+   </item>
+   <item>
+    <widget class="QCheckBox" name="chb_Iamb">
+     <property name="text">
+      <string>Ambient Field Measurement</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="horizontalLayout_3">
+     <item>
+      <widget class="QLabel" name="label_3">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
        <property name="text">
-        <string>Comments:</string>
+        <string>Iamb measurement:</string>
        </property>
       </widget>
      </item>
-     <item row="1" column="0">
-      <widget class="QTextEdit" name="te_comments"/>
+     <item>
+      <widget class="QComboBox" name="cmb_Iamb"/>
      </item>
     </layout>
    </item>
@@ -125,6 +148,22 @@
     <hint type="destinationlabel">
      <x>286</x>
      <y>274</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>chb_Iamb</sender>
+   <signal>clicked(bool)</signal>
+   <receiver>cmb_Iamb</receiver>
+   <slot>setDisabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>221</x>
+     <y>141</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>272</x>
+     <y>166</y>
     </hint>
    </hints>
   </connection>

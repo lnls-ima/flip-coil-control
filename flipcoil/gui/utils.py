@@ -7,6 +7,7 @@ import numpy as _np
 import pandas as _pd
 import time as _time
 import os.path as _path
+import traceback as _traceback
 # import pyqtgraph as _pyqtgraph
 from qtpy.QtGui import (
     QFont as _QFont,
@@ -115,11 +116,40 @@ def get_value_from_string(text):
 
 
 def sleep(time):
+    """Halts the program while processing UI events.
+
+    Args:
+        time (float): time to halt the program in seconds."""
     _dt = 0.1
     _tf = _time.time() + time
     while _time.time() < _tf:
         _QApplication.processEvents()
         _time.sleep(_dt)
+
+
+def update_db_name_list(db, cmb):
+    """Updates a db name list on a combobox.
+
+    Args:
+        Db (DatabaseAndFileDocument): database instance;
+        cmb (QComboBox): QComboBox instance.
+    """
+    try:
+        db.db_update_database(
+            database_name=_QApplication.instance().database_name,
+            mongo=_QApplication.instance().mongo,
+            server=_QApplication.instance().server)
+        names = db.db_get_values('name')
+
+        current_text = cmb.currentText()
+        cmb.clear()
+        cmb.addItems([name for name in names])
+        if len(current_text) == 0:
+            cmb.setCurrentIndex(cmb.count()-1)
+        else:
+            cmb.setCurrentText(current_text)
+    except Exception:
+        _traceback.print_exc(file=_sys.stdout)
 
 # def plot_item_add_first_right_axis(plot_item):
 #     """Add axis to graph."""

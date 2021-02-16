@@ -21,6 +21,7 @@ from flipcoil.gui.measurementdialog import MeasurementDialog \
 from flipcoil.gui.utils import (
     get_ui_file as _get_ui_file,
     sleep as _sleep,
+    update_db_name_list as _update_db_name_list,
     )
 from flipcoil.devices import (
     ppmac as _ppmac,
@@ -72,7 +73,7 @@ class MeasurementWidget(_QWidget):
 
     def connect_signal_slots(self):
         """Create signal/slot connections."""
-        self.ui.pbt_measure.clicked.connect(self.measure)
+        self.ui.pbt_measure.clicked.connect(self.meas_dialog)
         self.ui.pbt_test.clicked.connect(self.test_steps)
         self.ui.pbt_save_cfg.clicked.connect(self.save_cfg)
         self.ui.pbt_load_cfg.clicked.connect(self.load_cfg)
@@ -96,12 +97,14 @@ class MeasurementWidget(_QWidget):
             _frw_steps = [self.ui.sb_frw5.value(), self.ui.sb_frw6.value()]
             _bck_steps = [self.ui.sb_bck5.value(), self.ui.sb_bck6.value()]
 
-            _ppmac.write('#5j^' + str(_frw_steps[0]) +
-                         ';#6j^' + str(_frw_steps[1]))
+            with _ppmac.lock_ppmac:
+                _ppmac.write('#5j^' + str(_frw_steps[0]) +
+                             ';#6j^' + str(_frw_steps[1]))
             _sleep(5)
             pos7f, pos8f = _ppmac.read_motor_pos([7, 8])
-            _ppmac.write('#5j^' + str(_bck_steps[0]) +
-                         ';#6j^' + str(_bck_steps[1]))
+            with _ppmac.lock_ppmac:
+                _ppmac.write('#5j^' + str(_bck_steps[0]) +
+                             ';#6j^' + str(_bck_steps[1]))
             print(pos7f, pos8f)
             _sleep(5)
             pos7b, pos8b = _ppmac.read_motor_pos([7, 8])
@@ -112,24 +115,16 @@ class MeasurementWidget(_QWidget):
     def update_cfg_list(self):
         """Updates configuration name list in combobox."""
         try:
-            self.cfg.db_update_database(
-                database_name=self.database_name,
-                mongo=self.mongo, server=self.server)
-            names = self.cfg.db_get_values('name')
-
-            current_text = self.ui.cmb_cfg_name.currentText()
-            self.ui.cmb_cfg_name.clear()
-            self.ui.cmb_cfg_name.addItems([name for name in names])
-            if len(current_text) == 0:
-                self.ui.cmb_cfg_name.setCurrentIndex(
-                    self.ui.cmb_cfg_name.count()-1)
-            else:
-                self.ui.cmb_cfg_name.setCurrentText(current_text)
+            _update_db_name_list(self.cfg, self.ui.cmb_cfg_name)
         except Exception:
             _traceback.print_exc(file=_sys.stdout)
 
     def update_cfg_from_ui(self):
-        """Updates current configuration from ui widgets."""
+        """Updates current measurement configuration from ui widgets.
+
+        Returns:
+            True if successfull;
+            False otherwise."""
         try:
             self.cfg.name = self.ui.cmb_cfg_name.currentText()
 
@@ -144,20 +139,22 @@ class MeasurementWidget(_QWidget):
                                   self.ui.rdb_cw.isChecked() * 'cw')
             self.cfg.start_pos = self.ui.dsp_start_pos.value()  # [deg]
             self.cfg.nmeasurements = self.ui.sb_nmeasurements.value()
-            self.cfg.max_init_error = self.ui.dsb_max_err.value()
+            self.cfg.max_init_error = (
+                self.parent_window.motors.ui.sb_rot_max_err.value())
 
             self.cfg.nplc = self.ui.sb_nplc.value()
             self.cfg.duration = self.ui.dsb_duration.value()
 
             self.cfg.width = self.ui.dsb_width.value() * 10**-3  # [m]
             self.cfg.turns = self.ui.sb_turns.value()
-            self.cfg.speed = self.parent_window.motors.ui.dsb_speed.value()  # [rev/s]
-            self.cfg.accel = self.parent_window.motors.ui.dsb_accel.value()  # [rev/s^2]
-            self.cfg.jerk = self.parent_window.motors.ui.dsb_jerk.value()
+            self.cfg.speed = self.parent_window.motors.ui.dsb_speed.value()  # [turns/s]
+            self.cfg.accel = self.parent_window.motors.ui.dsb_accel.value()  # [turns/s^2]
+            self.cfg.jerk = self.parent_window.motors.ui.dsb_jerk.value()  # [turns/s^3]
 
             return True
         except Exception:
             _traceback.print_exc(file=_sys.stdout)
+            return False
 
     def save_cfg(self):
         """Saves current ui configuration into database."""
@@ -188,7 +185,7 @@ class MeasurementWidget(_QWidget):
                 mongo=self.mongo, server=self.server)
             _id = self.cfg.db_search_field('name', name)[0]['id']
             self.cfg.db_read(_id)
-            self.load_cfg_on_ui()
+            self.load_cfg_into_ui()
             _QMessageBox.information(self, 'Information',
                                      'Configuration Loaded.',
                                      _QMessageBox.Ok)
@@ -200,8 +197,8 @@ class MeasurementWidget(_QWidget):
             _traceback.print_exc(file=_sys.stdout)
             return False
 
-    def load_cfg_on_ui(self):
-        """Loads database configuration on ui widgets."""
+    def load_cfg_into_ui(self):
+        """Loads database configuration into ui widgets."""
         try:
             self.ui.cmb_cfg_name.setCurrentText(self.cfg.name)
 
@@ -229,15 +226,29 @@ class MeasurementWidget(_QWidget):
         except Exception:
             _traceback.print_exc(file=_sys.stdout)
 
-    def measure(self):
+    def meas_dialog(self):
         """Creates measurement dialog."""
         self.dialog = _MeasurementDialog()
         self.dialog.show()
         self.dialog.accepted.connect(self.measure_first_integral)
         self.dialog.rejected.connect(self.cancel_measurement)
 
+        _update_db_name_list(self.meas, self.dialog.ui.cmb_meas_name)
+        self.update_iamb_list()
+
+    def update_iamb_list(self):
+        """Updates Iamb list on measurement dialog."""
+        self.meas.db_update_database(
+            self.database_name,
+            mongo=self.mongo, server=self.server)
+
+        self.dialog.amb_list = self.meas.db_search_field('Iamb_id', 0)
+        self.dialog.ui.cmb_Iamb.addItems(
+            [item['name'] for item in self.dialog.amb_list])
+        self.dialog.ui.cmb_Iamb.setCurrentIndex(len(self.dialog.amb_list)-1)
+
     def cancel_measurement(self):
-        """Cancels measruement and destroys measurement dialog."""
+        """Cancels measurement and destroys measurement dialog."""
         self.dialog.destroy()
 
     def measure_first_integral(self, fdi_mode=False):
@@ -248,18 +259,32 @@ class MeasurementWidget(_QWidget):
             False otherwise.
         """
         try:
+            _ppmac.flag_abort = False
             self.update_cfg_from_ui()
 
             self.meas.name = self.dialog.ui.cmb_meas_name.currentText()
             self.meas.comments = self.dialog.ui.te_comments.toPlainText()
-            self.meas.Iamb = self.dialog.ui.chb_Iamb.isChecked()*1
+            if self.dialog.ui.chb_Iamb.isChecked():
+                self.meas.Iamb_id = 0
+            else:
+                _id = self.dialog.ui.cmb_Iamb.currentIndex()
+                self.meas.Iamb_id = self.dialog.amb_list[_id]['id']
             self.meas.cfg_id = self.ui.cmb_cfg_name.currentIndex() + 1
 
-            speed = self.cfg.speed*102.4  # [rev/s]
+            ppmac_cfg = self.parent_window.motors.cfg
+            speed = self.cfg.speed * ppmac_cfg.steps_per_turn * 10**-3  # [turns/s]
+            if self.cfg.accel != 0:
+                ta = -1/self.cfg.accel * 1/ppmac_cfg.steps_per_turn * 10**6  # [turns/s^2]
+            else:
+                ta = 0
+            if self.cfg.jerk != 0:
+                ts = -1/self.cfg.jerk * 1/ppmac_cfg.steps_per_turn * 10**9  # [turns/s^3]
+            else:
+                ts = 0
             start_pos = int(self.cfg.start_pos*10**3)
-            ta = -0.4  # acceleration time [ms]
-            ts = 0  # jerk time [ms]
-            wait = 2000  # time to wait between moves [ms]
+#             ta = -0.4  # acceleration time [ms]
+#             ts = 0  # jerk time [ms]
+#             wait = 2000  # time to wait between moves [ms]
 
             _prg_dialog = _QProgressDialog('Measurement', 'Abort', 0,
                                            self.cfg.nmeasurements + 1, self)
@@ -274,19 +299,26 @@ class MeasurementWidget(_QWidget):
             self.meas.pos8f = _np.zeros((2, self.cfg.nmeasurements))
             self.meas.pos8b = _np.zeros((2, self.cfg.nmeasurements))
 
-            _ppmac.write('#1..4k')
-            msg = ('startPos=' + str(start_pos) +
-                   ';Av=' + str(speed) + ';Aac=' + str(ta) +
-                   ';Aj=' + str(ts) + ';wait=' + str(wait))
-            _ppmac.write(msg)
-            msg = ('Motor[{0}].JogSpeed={1};'
-                   'Motor[{0}].JogTa={2};'
-                   'Motor[{0}].JogTs={3}'.format(5, speed, ta, ts))
-            _ppmac.write(msg)
-            msg = ('Motor[{0}].JogSpeed={1};'
-                   'Motor[{0}].JogTa={2};'
-                   'Motor[{0}].JogTs={3}'.format(6, speed, ta, ts))
-            _ppmac.write(msg)
+            with _ppmac.lock_ppmac:
+                _ppmac.write('#1..4k')
+                _sleep(1)
+                self.meas.x_pos = (_ppmac.read_motor_pos([1, 3])[0] *
+                                   self.parent_window.motors.x_sf)
+                self.meas.y_pos = (_ppmac.read_motor_pos([2, 4])[0] *
+                                   self.parent_window.motors.y_sf)
+
+    #             msg = ('startPos=' + str(start_pos) +
+    #                    ';Av=' + str(speed) + ';Aac=' + str(ta) +
+    #                    ';Aj=' + str(ts) + ';wait=' + str(wait))
+    #             _ppmac.write(msg)
+                msg = ('Motor[{0}].JogSpeed={1};'
+                       'Motor[{0}].JogTa={2};'
+                       'Motor[{0}].JogTs={3}'.format(5, speed, ta, ts))
+                _ppmac.write(msg)
+                msg = ('Motor[{0}].JogSpeed={1};'
+                       'Motor[{0}].JogTa={2};'
+                       'Motor[{0}].JogTs={3}'.format(6, speed, ta, ts))
+                _ppmac.write(msg)
 
             if fdi_mode:
                 counts = _fdi.configure_integrator(time=self.cfg.duration,
@@ -301,6 +333,7 @@ class MeasurementWidget(_QWidget):
             for i in range(self.cfg.nmeasurements):
                 if _prg_dialog.wasCanceled():
                     _prg_dialog.destroy()
+                    _ppmac.flag_abort = True
                     return False
 
                 if (self.flag_rm_backlash and
@@ -315,8 +348,9 @@ class MeasurementWidget(_QWidget):
 
                 self.meas.pos7f[0, i], self.meas.pos8f[0, i] = (
                     _ppmac.read_motor_pos([7, 8]))
-                _ppmac.write('#5j^' + str(self.cfg.steps_f[0]) +
-                             ';#6j^' + str(self.cfg.steps_f[1]))
+                with _ppmac.lock_ppmac:
+                    _ppmac.write('#5j^' + str(self.cfg.steps_f[0]) +
+                                 ';#6j^' + str(self.cfg.steps_f[1]))
 
                 if fdi_mode:
                     while(_fdi.get_data_count() < counts - 1):
@@ -344,8 +378,9 @@ class MeasurementWidget(_QWidget):
 
                 self.meas.pos7b[0, i], self.meas.pos8b[0, i] = (
                     _ppmac.read_motor_pos([7, 8]))
-                _ppmac.write('#5j^' + str(self.cfg.steps_b[0]) +
-                             ';#6j^' + str(self.cfg.steps_b[1]))
+                with _ppmac.lock_ppmac:
+                    _ppmac.write('#5j^' + str(self.cfg.steps_b[0]) +
+                                 ';#6j^' + str(self.cfg.steps_b[1]))
                 if fdi_mode:
                     while(_fdi.get_data_count() < counts - 1):
                         _sleep(0.1)
@@ -376,80 +411,26 @@ class MeasurementWidget(_QWidget):
                 self.save_log(self.meas.pos7b, 'pos7b')
                 self.save_log(self.meas.pos8b, 'pos8b')
 
+            self.meas = self.parent_window.analysis.first_integral_calculus(
+                cfg=self.cfg, meas=self.meas)
+            self.save_measurement()
+            self.parent_window.analysis.update_meas_list()
+            _count = self.parent_window.analysis.cmb_meas_name.count() - 1
+            self.parent_window.analysis.cmb_meas_name.setCurrentIndex(_count)
+#             self.parent_window.analysis.plot(plot_from_measurementwidget=True)
+
             _prg_dialog.destroy()
             _QMessageBox.information(self, 'Information',
                                      'Measurement Finished.',
                                      _QMessageBox.Ok)
-
-            self.meas = self.first_integral_calculus(cfg=self.cfg,
-                                                     meas=self.meas)
-            self.save_measurement()
-            self.parent_window.analysis.update_meas_list()
             return True
 
         except Exception:
             _traceback.print_exc(file=_sys.stdout)
+            _QMessageBox.information(self, 'Warning',
+                                     'Measurement Failed.',
+                                     _QMessageBox.Ok)
             return False
-
-    def first_integral_calculus(self, cfg, meas, fdi_mode=False):
-        """Calculates first field integral from raw data.
-
-        Args:
-            cfg (MeasurementConfig): measurement configuration;
-            meas (MeasurementData): measurement data.
-
-        Returns:
-            MeaseurementData instance if the calculations were successfull,
-            None otherwise
-        """
-        try:
-            # _width = 12.5e-3  # [m]
-            _width = cfg.width
-            _turns = cfg.turns  # number of coil turns
-            _dt = cfg.nplc/60
-            # I = flux/(2*N*width)
-            if not fdi_mode:
-                for i in range(meas.data_frw.shape[1]):
-                    _offset_f = meas.data_frw[:40, i].mean()
-                    _offset_b = meas.data_bck[:40, i].mean()
-                    _f_f = _np.array([0])
-                    _f_b = _np.array([0])
-                    for idx in range(meas.data_frw[:, i].shape[0]-1):
-                        # dv = ((v[i+1] - v[i])/2)/0.05
-                        # f = np.append(f, f[i]+dv)
-                        _f_f_part = meas.data_frw[:idx, i] - _offset_f
-                        _f_b_part = meas.data_bck[:idx, i] - _offset_b
-                        _f_f = _np.append(_f_f, _np.trapz(_f_f_part, dx=_dt))
-                        _f_b = _np.append(_f_b, _np.trapz(_f_b_part, dx=_dt))
-                    if i == 0:
-                        meas.flx_f = _f_f
-                        meas.flx_b = _f_b
-                    else:
-                        meas.flx_f = _np.vstack([meas.flx_f, _f_f])
-                        meas.flx_b = _np.vstack([meas.flx_b, _f_b])
-                meas.flx_f = meas.flx_f.transpose()
-                meas.flx_b = meas.flx_b.transpose()
-            else:
-                meas.flx_f = _np.copy(meas.data_frw)
-                meas.flx_b = _np.copy(meas.data_bck)
-
-            meas.I_f = meas.flx_f * 1/(2*_turns*_width)
-            meas.I_b = meas.flx_b * 1/(2*_turns*_width)
-            meas.I = (meas.flx_f - meas.flx_b)/2 * 1/(2*_turns*_width)
-
-            meas.If = meas.I_f[61, :] - meas.I_f[40, :]
-            meas.If_std = meas.If.std()
-
-            meas.Ib = meas.I_b[61, :] - meas.I_b[40, :]
-            meas.Ib_std = meas.Ib.std()
-
-            meas.I_mean = (meas.If.mean() - meas.Ib.mean())/2
-            meas.I_std = 1/2*(meas.If_std**2 + meas.Ib_std**2)**0.5
-
-            return meas
-        except Exception:
-            _traceback.print_exc(file=_sys.stdout)
-            return None
 
     def save_measurement(self):
         """Saves current measurement into database."""

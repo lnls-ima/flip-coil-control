@@ -38,8 +38,12 @@ class MeasurementData(_database.DatabaseAndFileDocument):
             {'field': 'pos8b', 'dtype': _np.ndarray, 'not_null': True}),
         ('cfg_id',
             {'field': 'cfg_id', 'dtype': int, 'not_null': True}),
-        ('Iamb',
-            {'field': 'Iamb', 'dtype': int, 'not_null': True}),
+        ('Iamb_id',
+            {'field': 'Iamb_id', 'dtype': int, 'not_null': True}),
+        ('x_pos',
+            {'field': 'x_pos', 'dtype': _np.ndarray, 'not_null': True}),
+        ('y_pos',
+            {'field': 'y_pos', 'dtype': _np.ndarray, 'not_null': True}),
     ])
 
     def __init__(

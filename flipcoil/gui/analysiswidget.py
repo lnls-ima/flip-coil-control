@@ -3,6 +3,7 @@
 import os as _os
 import sys as _sys
 import numpy as _np
+import time as _time
 import traceback as _traceback
 
 from qtpy.QtWidgets import (
@@ -15,7 +16,13 @@ from qtpy.QtCore import Qt as _Qt
 import qtpy.uic as _uic
 
 import flipcoil.data as _data
-from flipcoil.gui.utils import get_ui_file as _get_ui_file
+from flipcoil.gui.utils import (
+    get_ui_file as _get_ui_file,
+    sleep as _sleep,
+    update_db_name_list as _update_db_name_list,
+    )
+
+from flipcoil.gui.viewcfgwidget import ViewCfgWidget as _ViewCfgWidget
 
 import matplotlib
 from PyQt5.uic.Compiler.qtproxies import QtWidgets
@@ -52,7 +59,11 @@ class AnalysisWidget(_QWidget):
         self.cfg = _data.configuration.MeasurementConfig()
         self.meas = _data.measurement.MeasurementData()
 
+        self.amb_cfg = _data.configuration.MeasurementConfig()
+        self.amb_meas = _data.measurement.MeasurementData()
+
         self.connect_signal_slots()
+        self.update_meas_list()
 
     @property
     def database_name(self):
@@ -76,8 +87,47 @@ class AnalysisWidget(_QWidget):
 
     def connect_signal_slots(self):
         """Create signal/slot connections."""
-        self.ui.cmb_plot.currentIndexChanged.connect(self.plot)
+        self.ui.cmb_meas_name.currentIndexChanged.connect(
+            self.load_measurement)
+        self.ui.pbt_load_meas.clicked.connect(self.load_measurement)
+        self.ui.cmb_plot.currentIndexChanged.connect(
+            lambda: self.plot(False))
         self.ui.pbt_update.clicked.connect(self.update_meas_list)
+        self.ui.pbt_viewcfg.clicked.connect(self.view_cfg)
+
+    def view_cfg(self):
+        try:
+            self.viewcfg = _ViewCfgWidget()
+            self.viewcfg.show()
+
+            name = self.cfg.name + ' / ' + str(self.cfg.idn)
+            self.viewcfg.ui.le_name_id.setText(name)
+            self.viewcfg.ui.le_date.setText(self.cfg.date)
+            self.viewcfg.ui.le_hour.setText(self.cfg.hour)
+
+            self.viewcfg.ui.sb_frw5.setValue(self.cfg.steps_f[0])
+            self.viewcfg.ui.sb_frw6.setValue(self.cfg.steps_f[1])
+            self.viewcfg.ui.sb_bck5.setValue(self.cfg.steps_b[0])
+            self.viewcfg.ui.sb_bck6.setValue(self.cfg.steps_b[1])
+
+            if self.cfg.direction == 'ccw':
+                self.viewcfg.ui.rdb_ccw.setChecked(True)
+            else:
+                self.viewcfg.ui.rdb_cw.setChecked(True)
+            self.viewcfg.ui.dsp_start_pos.setValue(self.cfg.start_pos)  # [deg]
+            self.viewcfg.ui.sb_nmeasurements.setValue(self.cfg.nmeasurements)
+            self.viewcfg.ui.sb_rot_max_err.setValue(self.cfg.max_init_error)
+
+            self.viewcfg.ui.sb_nplc.setValue(self.cfg.nplc)
+            self.viewcfg.ui.dsb_duration.setValue(self.cfg.duration)
+
+            self.viewcfg.ui.dsb_width.setValue(self.cfg.width * 10**3)  # [mm]
+            self.viewcfg.ui.sb_turns.setValue(self.cfg.turns)
+            self.parent_window.motors.ui.dsb_speed.setValue(self.cfg.speed)  # [rev/s]
+            self.parent_window.motors.ui.dsb_accel.setValue(self.cfg.accel)  # [rev/s^2]
+            _QApplication.processEvents()
+        except Exception:
+            _traceback.print_exc(file=_sys.stdout)
 
     def set_pyplot(self):
         """Configures plot widget"""
@@ -93,105 +143,224 @@ class AnalysisWidget(_QWidget):
     def update_meas_list(self):
         """Update measurement list in combobox."""
         try:
-            self.meas.db_update_database(
-                database_name=self.database_name,
-                mongo=self.mongo, server=self.server)
-            names = self.meas.db_get_values('name')
-
-            current_text = self.ui.cmb_meas_name.currentText()
-            self.ui.cmb_meas_name.clear()
-            self.ui.cmb_meas_name.addItems([name for name in names])
-            if len(current_text) == 0:
-                self.ui.cmb_meas_name.setCurrentIndex(
-                    self.ui.cmb_meas_name.count()-1)
-            else:
-                self.ui.cmb_meas_name.setCurrentText(current_text)
+            self.ui.cmb_meas_name.currentIndexChanged.disconnect()
+            _update_db_name_list(self.meas, self.ui.cmb_meas_name)
+            self.ui.cmb_meas_name.currentIndexChanged.connect(
+                self.load_measurement)
         except Exception:
             _traceback.print_exc(file=_sys.stdout)
 
     def load_measurement(self):
         """Loads selected measurement from database."""
         try:
-            pass
-#             self.parent_window.measurement.first_integral_calculus(
-#                 cfg=self.cfg, meas=self.meas)
-#             name = self.ui.cmb_cfg_name.currentText()
-#             self.cfg.db_update_database(
-#                 self.database_name,
-#                 mongo=self.mongo, server=self.server)
-#             _id = self.cfg.db_search_field('name', name)[0]['id']
-#             self.cfg.db_read(_id)
-#             self.load_cfg_on_ui()
-#             _QMessageBox.information(self, 'Information',
-#                                      'Configuration Loaded.',
+            self.cfg.db_update_database(
+                self.database_name,
+                mongo=self.mongo, server=self.server)
+            self.meas.db_update_database(
+                self.database_name,
+                mongo=self.mongo, server=self.server)
+            meas_list = []
+            for i in range(self.ui.cmb_meas_name.count()):
+                meas_list.append(self.ui.cmb_meas_name.itemText(i))
+            meas_name = self.ui.cmb_meas_name.currentText()
+            meas_cmb_idx = self.ui.cmb_meas_name.currentIndex()
+            if all([meas_list.count(meas_name) > 1,
+                    meas_cmb_idx > 0]):
+                idx = -1
+                for i in range(len(meas_list)):
+                    if meas_name == meas_list[i]:
+                        idx += 1
+            else:
+                idx = 0
+            _id = self.meas.db_search_field('name', meas_name)[idx]['id']
+            self.meas.db_read(_id)
+            self.ui.le_comments.setText(self.meas.comments)
+
+            self.cfg.db_read(self.meas.cfg_id)
+            self.first_integral_calculus(cfg=self.cfg, meas=self.meas)
+
+            cfg_name = self.cfg.name + ' / ' + str(self.cfg.idn)
+            self.ui.le_cfg_name.setText(cfg_name)
+
+            _QApplication.processEvents()
+            self.plot()
+#             _QMessageBox.information(self, 'Informat    ion',
+#                                      'Measurement Loaded.',
 #                                      _QMessageBox.Ok)
             return True
         except Exception:
+            _traceback.print_exc(file=_sys.stdout)
             _QMessageBox.warning(self, 'Information',
                                  'Failed to load this configuration.',
                                  _QMessageBox.Ok)
-            _traceback.print_exc(file=_sys.stdout)
             return False
 
-    def plot(self):
+    def first_integral_calculus(self, cfg, meas, fdi_mode=False):
+        """Calculates first field integral from raw data.
+
+        Args:
+            cfg (MeasurementConfig): measurement configuration;
+            meas (MeasurementData): measurement data.
+
+        Returns:
+            MeaseurementData instance if the calculations were successfull;
+            None otherwise
+        """
         try:
-            _meas = self.parent_window.measurement.meas
+            # _width = 12.5e-3  # [m]
+            _width = cfg.width
+            _turns = cfg.turns  # number of coil turns
+            _dt = cfg.nplc/60
+            # I = flux/(2*N*width)
+            if not fdi_mode:
+                for i in range(meas.data_frw.shape[1]):
+                    _offset_f = meas.data_frw[:40, i].mean()
+                    _offset_b = meas.data_bck[:40, i].mean()
+                    _f_f = _np.array([0])
+                    _f_b = _np.array([0])
+                    for idx in range(meas.data_frw[:, i].shape[0]-1):
+                        # dv = ((v[i+1] - v[i])/2)/0.05
+                        # f = np.append(f, f[i]+dv)
+                        _f_f_part = meas.data_frw[:idx, i] - _offset_f
+                        _f_b_part = meas.data_bck[:idx, i] - _offset_b
+                        _f_f = _np.append(_f_f, _np.trapz(_f_f_part, dx=_dt))
+                        _f_b = _np.append(_f_b, _np.trapz(_f_b_part, dx=_dt))
+                    if i == 0:
+                        meas.flx_f = _f_f
+                        meas.flx_b = _f_b
+                    else:
+                        meas.flx_f = _np.vstack([meas.flx_f, _f_f])
+                        meas.flx_b = _np.vstack([meas.flx_b, _f_b])
+                meas.flx_f = meas.flx_f.transpose()
+                meas.flx_b = meas.flx_b.transpose()
+            else:
+                meas.flx_f = _np.copy(meas.data_frw)
+                meas.flx_b = _np.copy(meas.data_bck)
+
+            meas.I_f = meas.flx_f * 1/(2*_turns*_width)
+            meas.I_b = meas.flx_b * 1/(2*_turns*_width)
+            meas.I = (meas.flx_f - meas.flx_b)/2 * 1/(2*_turns*_width)
+
+            meas.If = meas.I_f[61, :] - meas.I_f[40, :]
+            meas.If_std = meas.If.std()
+
+            meas.Ib = meas.I_b[61, :] - meas.I_b[40, :]
+            meas.Ib_std = meas.Ib.std()
+
+            meas.I_mean = (meas.If.mean() - meas.Ib.mean())/2
+            meas.I_std = 1/2*(meas.If_std**2 + meas.Ib_std**2)**0.5
+
+            if meas.Iamb_id > 0:
+                self.amb_cfg.db_update_database(
+                    self.database_name,
+                    mongo=self.mongo, server=self.server)
+                self.amb_meas.db_update_database(
+                    self.database_name,
+                    mongo=self.mongo, server=self.server)
+
+                self.amb_meas.db_read(self.meas.Iamb_id)
+                self.amb_cfg.db_read(self.amb_meas.cfg_id)
+                self.ambient_field_calculus(meas=meas)
+            else:
+                self.ui.le_Imeas.setText('')
+                self.ui.le_Iamb.setText('')
+                self.ui.le_Iamb_name.setText('')
+
+            return meas
+
+        except Exception:
+            _traceback.print_exc(file=_sys.stdout)
+            return None
+
+    def ambient_field_calculus(self, meas):
+        """Discounts ambient field from measurement and prints results."""
+        _result = '{:.2f} +/- {:.2f}'.format(meas.I_mean*10**6,
+                                             meas.I_std*10**6)
+
+        meas.I_mean = meas.I_mean - self.amb_meas.I_mean
+        meas.I_std = (meas.I_std**2 + self.amb_meas.I_std**2)**0.5
+
+        _result1 = '{:.2f} +/- {:.2f}'.format(self.amb_meas.I_mean*10**6,
+                                              self.amb_meas.I_std*10**6)
+        _amb_name = self.amb_meas.name + ' / ' + str(self.amb_meas.idn)
+
+        self.ui.le_Imeas.setText(_result)
+        self.ui.le_Iamb.setText(_result1)
+        self.ui.le_Iamb_name.setText(_amb_name)
+
+    def plot(self, plot_from_measurementwidget=False):
+        """Plots measurement data.
+
+        Args:
+            plot_from_measurementwidget (bool): flag indicating wether to get
+            measruement data and configurations from measuerement widget (if
+            True) or analysis widget (if False, default)."""
+        try:
+            if plot_from_measurementwidget:
+                _meas = self.parent_window.measurement.meas
+                _cfg = self.parent_window.measurement.cfg
+            else:
+                _meas = self.meas
+                _cfg = self.cfg
+            _dt = _cfg.nplc/60
+            _t = _np.linspace(0, _cfg.duration, _meas.I.shape[0])
 
             self.canvas.axes.cla()
             if self.ui.cmb_plot.currentText() == 'Integrated Field Result':
                 for i in range(_meas.I.shape[1]):
-                    self.canvas.axes.plot(_meas.I[:, i], label=str(i))
-                self.canvas.axes.set_xlabel('Time [*0.05s]')
+                    self.canvas.axes.plot(_t, _meas.I[:, i], label=str(i))
+                self.canvas.axes.set_xlabel('Time [s]'.format(_dt))
                 self.canvas.axes.set_ylabel('First Field Integral [T.m]')
 
             elif self.ui.cmb_plot.currentText() == 'Forward Results':
                 for i in range(_meas.I_f.shape[1]):
                     _color = 'C' + str(i)
-                    self.canvas.axes.plot(_meas.I_f[:, i], _color + '-',
+                    self.canvas.axes.plot(_t, _meas.I_f[:, i], _color + '-',
                                           label=str(i))
-                self.canvas.axes.set_xlabel('Time [*0.05s]')
+                self.canvas.axes.set_xlabel('Time [s]'.format(_dt))
                 self.canvas.axes.set_ylabel('First Field Integral [T.m]')
 
             elif self.ui.cmb_plot.currentText() == 'Backward Results':
                 for i in range(_meas.I_b.shape[1]):
                     _color = 'C' + str(i)
-                    self.canvas.axes.plot(_meas.I_b[:, i], _color + '-',
+                    self.canvas.axes.plot(_t, _meas.I_b[:, i], _color + '-',
                                           label=str(i))
-                self.canvas.axes.set_xlabel('Time [*0.05s]')
+                self.canvas.axes.set_xlabel('Time [s]'.format(_dt))
                 self.canvas.axes.set_ylabel('First Field Integral [T.m]')
 
             elif self.ui.cmb_plot.currentText() == 'Forward/Backward Results':
                 for i in range(_meas.I_f.shape[1]):
                     _color = 'C' + str(i)
-                    self.canvas.axes.plot(_meas.I_f[:, i], _color + '-',
+                    self.canvas.axes.plot(_t, _meas.I_f[:, i], _color + '-',
                                           label=str(i))
-                    self.canvas.axes.plot(_meas.I_b[:, i], _color + '--')
-                self.canvas.axes.set_xlabel('Time [*0.05s]')
+                    self.canvas.axes.plot(_t, _meas.I_b[:, i], _color + '--')
+                self.canvas.axes.set_xlabel('Time [s]'.format(_dt))
                 self.canvas.axes.set_ylabel('First Field Integral [T.m]')
 
             elif self.ui.cmb_plot.currentText() == 'Forward Voltage':
                 for i in range(_meas.data_frw.shape[1]):
                     _color = 'C' + str(i)
-                    self.canvas.axes.plot(_meas.data_frw[:, i], _color + '-',
-                                          label=str(i))
-                self.canvas.axes.set_xlabel('Time [*0.05s]')
+                    self.canvas.axes.plot(_t, _meas.data_frw[:, i],
+                                          _color + '-', label=str(i))
+                self.canvas.axes.set_xlabel('Time [s]'.format(_dt))
                 self.canvas.axes.set_ylabel('Voltage [V]')
 
             elif self.ui.cmb_plot.currentText() == 'Backward Voltage':
                 for i in range(_meas.data_bck.shape[1]):
                     _color = 'C' + str(i)
-                    self.canvas.axes.plot(_meas.data_bck[:, i], _color + '-',
-                                          label=str(i))
-                self.canvas.axes.set_xlabel('Time [*0.05s]')
+                    self.canvas.axes.plot(_t, _meas.data_bck[:, i],
+                                          _color + '-', label=str(i))
+                self.canvas.axes.set_xlabel('Time [s]'.format(_dt))
                 self.canvas.axes.set_ylabel('Voltage [V]')
 
             elif self.ui.cmb_plot.currentText() == 'Forward/Backward Voltage':
                 for i in range(_meas.data_frw.shape[1]):
                     _color = 'C' + str(i)
-                    self.canvas.axes.plot(_meas.data_frw[:, i], _color + '-',
-                                          label=str(i))
-                    self.canvas.axes.plot(_meas.data_bck[:, i], _color + '--')
-                self.canvas.axes.set_xlabel('Time [*0.05s]')
+                    self.canvas.axes.plot(_t, _meas.data_frw[:, i],
+                                          _color + '-', label=str(i))
+                    self.canvas.axes.plot(_t, _meas.data_bck[:, i],
+                                          _color + '--')
+                self.canvas.axes.set_xlabel('Time [s]'.format(_dt))
                 self.canvas.axes.set_ylabel('Voltage [V]')
 
             elif self.ui.cmb_plot.currentText() == 'Positioning Error':

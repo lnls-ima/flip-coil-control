@@ -54,16 +54,15 @@ class FlipCoilApp(_QApplication):
 #             _data.configuration.IntegratorConfig(
 #                 database_name=self.database_name,
 #                 mongo=self.mongo, server=self.server))
-#         _PpmacConfig = (
-#             _data.configuration.PpmacConfig(
-#                 database_name=self.database_name,
-#                 mongo=self.mongo, server=self.server))
 #         _PowerSupplyConfig = _data.configuration.PowerSupplyConfig(
 #             database_name=self.database_name,
 #             mongo=self.mongo, server=self.server)
 #         _CyclingCurve = _data.configuration.CyclingCurve(
 #             database_name=self.database_name,
 #             mongo=self.mongo, server=self.server)
+        _PpmacConfig = _data.configuration.PpmacConfig(
+            database_name=self.database_name,
+            mongo=self.mongo, server=self.server)
         _MeasurementConfig = _data.configuration.MeasurementConfig(
             database_name=self.database_name,
             mongo=self.mongo, server=self.server)
@@ -76,6 +75,7 @@ class FlipCoilApp(_QApplication):
 #         status.append(_PowerSupplyConfig.db_create_collection())
 #         status.append(_CyclingCurve.db_create_collection())
 #         status.append(_IntegratorConfig.db_create_collection())
+        status.append(_PpmacConfig.db_create_collection())
         status.append(_MeasurementConfig.db_create_collection())
         status.append(_MeasurementData.db_create_collection())
 

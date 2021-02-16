@@ -5,6 +5,7 @@ from imautils.devices.pydrs import SerialDRS
 from imautils.devices import Agilent3458ALib as _Agilent3458ALib
 import time as _time
 import numpy as _np
+import threading as _threading
 
 
 from flipcoil.gui.utils import (
@@ -102,94 +103,117 @@ class Fdi(Fdi_eth):
 
 class Ppmac(Ppmac_eth):
     # deltatau functions
+    def __init__(self):
+        super().__init__()
+        self.lock_ppmac = _threading.RLock()
+        self.flag_abort = False
+
     def motor_stopped(self, n=5):
-        msg = 'Motor[' + str(n) + '].DesVelZero'
-        self.write(msg)
-        _sleep(0.1)
-        ans = self.read().split(msg)[-1]
-        return int(ans.split(msg)[-1].split('=')[-1].split('\r')[0])
+        with self.lock_ppmac:
+            msg = 'Motor[' + str(n) + '].DesVelZero'
+            self.write(msg)
+            _sleep(0.1)
+            ans = self.read().split(msg)[-1]
+            return int(ans.split(msg)[-1].split('=')[-1].split('\r')[0])
 
     def in_motion(self):
-        msg = 'motionFlag'
-        self.write(msg)
-        _sleep(0.1)
-        ans = self.read().split(msg)[-1]
-        return int(ans.split('=')[-1][0])
+        with self.lock_ppmac:
+            msg = 'motionFlag'
+            self.write(msg)
+            _sleep(0.1)
+            ans = self.read().split(msg)[-1]
+            return int(ans.split('=')[-1][0])
 
     def read_motor_pos(self, motors=[]):
-        msg = '#'
-        msg = msg + str(motors).strip('[]').replace(' ', '')
-        msg = msg + 'p'
-        self.write(msg)
-        _sleep(0.1)
-        ans = self.read()
-        ans1 = ans.split(msg)[-1].strip('\r\n\x06').split(' ')
-        return [float(val) for val in ans1]
+        with self.lock_ppmac:
+            msg = '#'
+            msg = msg + str(motors).strip('[]').replace(' ', '')
+            msg = msg + 'p'
+            self.write(msg)
+            _sleep(0.1)
+            ans = self.read()
+            ans1 = ans.split(msg)[-1].strip('\r\n\x06').split(' ')
+            return [float(val) for val in ans1]
 
     def read_axis_pos(self, axis='', coord=1):
-        if all([axis is not None,
-                axis != '']):
-            msg = '&' + str(coord) + axis + 'p'
-            self.write(msg)
-            ans = self.read()
-            ans1 = ans.split(msg)[-1].strip('\r\n\x06')
-            return float(ans1)
-        else:
-            print(axis)
-            return None
+        with self.lock_ppmac:
+            if all([axis is not None,
+                    axis != '']):
+                msg = '&' + str(coord) + axis + 'p'
+                self.write(msg)
+                ans = self.read()
+                ans1 = ans.split(msg)[-1].strip('\r\n\x06')
+                return float(ans1)
+            else:
+                print(axis)
+                return None
+
+    def motor_homed(self, motor):
+        with self.lock_ppmac:
+            self.write("Motor{0}Homed".format(motor))
+            _ans = self.read()
+            if int(_ans.split('=')[-1].strip('\r\n\x06')):
+                return True
+            else:
+                return False
 
     def remove_backlash(self, target_pos=0, elim=2, ccw=1, max_tries=100):
-        target_pos_steps = int(target_pos*102400/360000)
-        if ccw > 0:
-            ccw = 1
-        else:
-            ccw = -1
-        dp = 10000  # 51200
-        dp5 = -1*dp
-        dp6 = dp
-        lim = elim
-        n_tries = 0
+        with self.lock_ppmac:
+            target_pos_steps = int(target_pos*102400/360000)
+            if ccw > 0:
+                ccw = 1
+            else:
+                ccw = -1
+            dp = 10000  # 51200
+            dp5 = -1*dp
+            dp6 = dp
+            lim = elim
+            n_tries = 0
 
-        self.write('#5j=' + str(ccw*(dp + -1*target_pos_steps)) +
-                   ';#6j=' + str(ccw*(-1*dp + target_pos_steps)))
-        _sleep(0.1)
-        while not self.motor_stopped(5):
-            _sleep(0.1)
-        _sleep(1)
-        self.write('#5j^' + str(-1*ccw*dp) +
-                   ';#6j^' + str(ccw*dp))
-        _sleep(0.1)
-        while not self.motor_stopped(5):
-            _sleep(0.1)
-        _sleep(1)
-        p_list = self.read_motor_pos([5, 6, 7, 8])
-
-        while(any([abs(-1*target_pos - p_list[-2]) > lim,
-                   abs(target_pos - p_list[-1]) > lim]) and
-                   n_tries < max_tries):
-            dp5 = dp5 + ccw*int((-1*target_pos - p_list[-2])*102400/360000)
-            dp6 = dp6 + ccw*int((target_pos - p_list[-1])*102400/360000)
             self.write('#5j=' + str(ccw*(dp + -1*target_pos_steps)) +
                        ';#6j=' + str(ccw*(-1*dp + target_pos_steps)))
             _sleep(0.1)
-            while(self.motor_stopped(5)):
+            while not self.motor_stopped(5):
                 _sleep(0.1)
             _sleep(1)
-            self.write('#5j^' + str(ccw*dp5) +
-                       ';#6j^' + str(ccw*dp6))
+            self.write('#5j^' + str(-1*ccw*dp) +
+                       ';#6j^' + str(ccw*dp))
             _sleep(0.1)
             while not self.motor_stopped(5):
                 _sleep(0.1)
             _sleep(1)
             p_list = self.read_motor_pos([5, 6, 7, 8])
-            n_tries = n_tries + 1
 
-        if n_tries < max_tries:
-            self.homez(5)
-            self.homez(6)
-            return True
-        else:
-            return False
+            while(any([abs(-1*target_pos - p_list[-2]) > lim,
+                       abs(target_pos - p_list[-1]) > lim]) and
+                       n_tries < max_tries):
+                dp5 = dp5 + ccw*int((-1*target_pos - p_list[-2])*102400/360000)
+                dp6 = dp6 + ccw*int((target_pos - p_list[-1])*102400/360000)
+                self.write('#5j=' + str(ccw*(dp + -1*target_pos_steps)) +
+                           ';#6j=' + str(ccw*(-1*dp + target_pos_steps)))
+                _sleep(0.1)
+                while(self.motor_stopped(5)):
+                    _sleep(0.1)
+                _sleep(1)
+                self.write('#5j^' + str(ccw*dp5) +
+                           ';#6j^' + str(ccw*dp6))
+                _sleep(0.1)
+                while not self.motor_stopped(5):
+                    _sleep(0.1)
+                _sleep(1)
+                p_list = self.read_motor_pos([5, 6, 7, 8])
+                n_tries = n_tries + 1
+
+                if self.flag_abort:
+                    self.flag_abort = False
+                    return False
+
+            if n_tries < max_tries:
+                self.homez(5)
+                self.homez(6)
+                return True
+            else:
+                return False
 
 
 ppmac = Ppmac()
