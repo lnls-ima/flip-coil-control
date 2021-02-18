@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>Form</class>
- <widget class="QWidget" name="Form">
+ <class>wg_connection</class>
+ <widget class="QWidget" name="wg_connection">
   <property name="geometry">
    <rect>
     <x>0</x>
@@ -33,7 +33,7 @@
    <item row="1" column="2">
     <widget class="QGroupBox" name="groupBox_4">
      <property name="enabled">
-      <bool>false</bool>
+      <bool>true</bool>
      </property>
      <property name="title">
       <string>Power Supply</string>
@@ -43,6 +43,9 @@
        <widget class="QCheckBox" name="chb_ps_en">
         <property name="text">
          <string>Enable</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
         </property>
        </widget>
       </item>
@@ -54,7 +57,13 @@
        </widget>
       </item>
       <item row="1" column="1">
-       <widget class="QComboBox" name="cmb_ps_port"/>
+       <widget class="QComboBox" name="cmb_ps_port">
+        <item>
+         <property name="text">
+          <string>COM6</string>
+         </property>
+        </item>
+       </widget>
       </item>
      </layout>
     </widget>

@@ -41,6 +41,7 @@ class ConnectionWidget(_QWidget):
 
         self.connect_signal_slots()
         self.update_serial_ports()
+        self.ui.cmb_ps_port.setCurrentText('COM6')
 
     def connect_signal_slots(self):
         """Create signal/slot connections."""
@@ -77,6 +78,7 @@ class ConnectionWidget(_QWidget):
             _agilent_addr = self.ui.sb_agilent_addr.value()
             _agilent_board = self.ui.sb_agilent_board.value()
             _ppmac.connect(_ppmac_ip)
+            _ps.Connect(self.ui.cmb_ps_port.currentText())
 #             _fdi.inst = _fdi.rm.open_resource(_fdi_inst.encode())
             _volt.connect(address=_agilent_addr, board=_agilent_board)
             _QMessageBox.information(self, 'Information',
@@ -97,6 +99,7 @@ class ConnectionWidget(_QWidget):
             _ppmac.disconnect()
             _fdi.disconnect()
             _volt.disconnect()
+            _ps.Disconnect()
             self.ui.pbt_connect.setEnabled(True)
             self.ui.pbt_disconnect.setEnabled(False)
             _QMessageBox.information(self, 'Information',

@@ -30,9 +30,3 @@ class ViewCfgWidget(_QDialog):
 
     def connect_signal_slots(self):
         pass
-
-    def update_postions(self):
-        pass
-
-    def update_progress_bar(self):
-        pass

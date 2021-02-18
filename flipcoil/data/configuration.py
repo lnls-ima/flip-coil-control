@@ -166,6 +166,44 @@ class PpmacConfig(_database.DatabaseAndFileDocument):
             database_name=database_name, mongo=mongo, server=server)
 
 
+class PowerSupplyConfig(_database.DatabaseAndFileDocument):
+    """Read, write and store Power Supply configuration data."""
+
+    label = 'PowerSupply'
+    collection_name = 'power_supply'
+    db_dict = _collections.OrderedDict([
+        ('idn',
+            {'field': 'id', 'dtype': int, 'not_null': True}),
+        ('date',
+            {'field': 'date', 'dtype': str, 'not_null': True}),
+        ('hour',
+            {'field': 'hour', 'dtype': str, 'not_null': True}),
+        ('name',
+            {'field': 'name', 'dtype': str, 'not_null': True}),
+        ('ps_type',
+            {'field': 'ps_type', 'dtype': int, 'not_null': True}),
+        ('dclink',
+            {'field': 'dclink', 'dtype': float, 'not_null': False}),
+        ('current_setpoint',
+            {'field': 'current_setpoint', 'dtype': float, 'not_null': True}),
+        ('min_current',
+            {'field': 'min_current', 'dtype': float, 'not_null': True}),
+        ('max_current',
+            {'field': 'max_current', 'dtype': float, 'not_null': True}),
+#         ('dcct',
+#             {'field': 'DCCT Enabled', 'dtype': int, 'not_null': True}),
+#         ('dcct_head',
+#             {'field': 'DCCT Head', 'dtype': int, 'not_null': True}),
+        ('kp',
+            {'field': 'kp', 'dtype': float, 'not_null': True}),
+        ('ki',
+            {'field': 'ki', 'dtype': float, 'not_null': True}),
+        ('current_array', {
+            'field': 'current_array',
+            'dtype': _np.ndarray, 'not_null': False}),
+    ])
+
+
 class MeasurementConfig(_database.DatabaseAndFileDocument):
     """Read, write and store measurement configuration data."""
 

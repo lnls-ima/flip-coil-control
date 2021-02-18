@@ -17,17 +17,12 @@ from flipcoil.gui.analysiswidget import AnalysisWidget \
     as _AnalysisWidget
 from flipcoil.gui.connectionwidget import ConnectionWidget \
     as _ConnectionWidget
-from flipcoil.gui.integratorwidget import IntegratorWidget \
-    as _IntegratorWidget
+from flipcoil.gui.powersupplywidget import PowerSupplyWidget \
+    as _PowerSupplyWidget
 from flipcoil.gui.measurementwidget import MeasurementWidget \
     as _MeasurementWidget
 from flipcoil.gui.ppmacwidget import PpmacWidget \
     as _PpmacWidget
-from flipcoil.gui.measurementdialog import MeasurementDialog \
-    as _MeasurementDialog
-
-# from flipcoil.gui.connectionwidget import ConnectionWidget \
-#     as _ConnectionWidget
 
 
 class FlipCoilWindow(_QMainWindow):
@@ -53,8 +48,7 @@ class FlipCoilWindow(_QMainWindow):
         self.tab_names = [
             'connection',
             'motors',
-#             'power_supply',
-#             'integrator',
+            'power supply',
             'measurement',
             'analysis',
             ]
@@ -62,8 +56,7 @@ class FlipCoilWindow(_QMainWindow):
         self.tab_widgets = [
             _ConnectionWidget(),
             _PpmacWidget(),
-#             _PowerSupplyWidget(),
-#             _IntegratorWidget(),
+            _PowerSupplyWidget(),
             _MeasurementWidget(),
             _AnalysisWidget(),
             ]
@@ -76,7 +69,7 @@ class FlipCoilWindow(_QMainWindow):
         for i in range(len(self.tab_names)):
             tab_name = self.tab_names[i]
             tab = self.tab_widgets[i]
-            setattr(self, tab_name, tab)
+            setattr(self, tab_name.replace(' ', ''), tab)
             self.ui.twg_main.addTab(tab, tab_name.capitalize())
             setattr(tab, 'parent_window', self)
 

@@ -77,6 +77,7 @@ class Multimeter(_Agilent3458ALib.Agilent3458AGPIB):
         volt.send_command('ERR?')
         return int(volt.read_from_device().strip('\r\n'))
 
+
 class Fdi(Fdi_eth):
     def configure_integrator(self, time=3, interval=50, base_frq=1000,
                              calibrate=0):
