@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-"""Main entry poin to the Flip Coil Control application."""
+"""Main entry point to the Flip Coil Control application."""
 
 import os as _os
 import sys as _sys
@@ -44,6 +44,7 @@ class FlipCoilApp(_QApplication):
         self.ppmac = _ppmac
         self.fdi = _fdi
         self.volt = _volt
+        self.ps = _ps
 
     def create_database(self):
         """Create database and tables."""
@@ -54,12 +55,12 @@ class FlipCoilApp(_QApplication):
 #             _data.configuration.IntegratorConfig(
 #                 database_name=self.database_name,
 #                 mongo=self.mongo, server=self.server))
-#         _PowerSupplyConfig = _data.configuration.PowerSupplyConfig(
-#             database_name=self.database_name,
-#             mongo=self.mongo, server=self.server)
 #         _CyclingCurve = _data.configuration.CyclingCurve(
 #             database_name=self.database_name,
 #             mongo=self.mongo, server=self.server)
+        _PowerSupplyConfig = _data.configuration.PowerSupplyConfig(
+            database_name=self.database_name,
+            mongo=self.mongo, server=self.server)
         _PpmacConfig = _data.configuration.PpmacConfig(
             database_name=self.database_name,
             mongo=self.mongo, server=self.server)
@@ -72,9 +73,9 @@ class FlipCoilApp(_QApplication):
 
         status = []
 #         status.append(_ConnectionConfig.db_create_collection())
-#         status.append(_PowerSupplyConfig.db_create_collection())
 #         status.append(_CyclingCurve.db_create_collection())
 #         status.append(_IntegratorConfig.db_create_collection())
+        status.append(_PowerSupplyConfig.db_create_collection())
         status.append(_PpmacConfig.db_create_collection())
         status.append(_MeasurementConfig.db_create_collection())
         status.append(_MeasurementData.db_create_collection())

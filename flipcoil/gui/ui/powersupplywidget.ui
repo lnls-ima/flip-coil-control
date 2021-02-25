@@ -13,42 +13,6 @@
   <property name="windowTitle">
    <string>Form</string>
   </property>
-  <widget class="QLCDNumber" name="lcd_actual_current">
-   <property name="geometry">
-    <rect>
-     <x>270</x>
-     <y>20</y>
-     <width>131</width>
-     <height>31</height>
-    </rect>
-   </property>
-  </widget>
-  <widget class="QLabel" name="label">
-   <property name="geometry">
-    <rect>
-     <x>180</x>
-     <y>30</y>
-     <width>81</width>
-     <height>16</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>Actual Current:</string>
-   </property>
-  </widget>
-  <widget class="QPushButton" name="pbt_refresh">
-   <property name="geometry">
-    <rect>
-     <x>420</x>
-     <y>20</y>
-     <width>75</width>
-     <height>23</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>Refresh</string>
-   </property>
-  </widget>
   <widget class="QPushButton" name="pbt_turn_on_off">
    <property name="geometry">
     <rect>
@@ -59,7 +23,7 @@
     </rect>
    </property>
    <property name="text">
-    <string>Turn On</string>
+    <string>Turn On/Off</string>
    </property>
   </widget>
   <widget class="QGroupBox" name="groupBox">
@@ -118,7 +82,7 @@
      <rect>
       <x>80</x>
       <y>40</y>
-      <width>62</width>
+      <width>81</width>
       <height>22</height>
      </rect>
     </property>
@@ -137,7 +101,7 @@
      <rect>
       <x>80</x>
       <y>70</y>
-      <width>62</width>
+      <width>81</width>
       <height>22</height>
      </rect>
     </property>
@@ -547,6 +511,63 @@
      <widget class="QPushButton" name="pbt_clear_table">
       <property name="text">
        <string>Clear</string>
+      </property>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QWidget" name="">
+   <property name="geometry">
+    <rect>
+     <x>20</x>
+     <y>20</y>
+     <width>661</width>
+     <height>41</height>
+    </rect>
+   </property>
+   <layout class="QHBoxLayout" name="horizontalLayout">
+    <item>
+     <widget class="QLabel" name="label_6">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="text">
+       <string>DCCT [A]:</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QLCDNumber" name="lcd_dcct_current"/>
+    </item>
+    <item>
+     <widget class="QLabel" name="label">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="text">
+       <string>PS Current[A]:</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QLCDNumber" name="lcd_actual_current"/>
+    </item>
+    <item>
+     <widget class="QPushButton" name="pbt_refresh">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Maximum" vsizetype="Fixed">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="text">
+       <string>Refresh</string>
       </property>
      </widget>
     </item>

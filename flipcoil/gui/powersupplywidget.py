@@ -21,7 +21,10 @@ from flipcoil.gui.utils import (
     update_db_name_list as _update_db_name_list,
     )
 
-from flipcoil.devices import ps as _ps
+from flipcoil.devices import (
+    ps as _ps,
+    mult as _mult,
+    )
 import flipcoil.data as _data
 
 
@@ -39,8 +42,10 @@ class PowerSupplyWidget(_QDialog):
         self.cfg = _data.configuration.PowerSupplyConfig()
 
         self.ps = _ps
+        self.mult = _mult
 
         self.connect_signal_slots()
+        self.update_cfg_list()
 
     @property
     def database_name(self):
@@ -298,6 +303,9 @@ class PowerSupplyWidget(_QDialog):
 
                 _status_interlocks = _ps.read_ps_softinterlocks()
 
+                if self.parent_window.connection.ui.chb_multichannel_en.isChecked():
+                    self.mult.config_temp_volt()
+
                 # PS 1000 A needs to turn dc link on
                 if _ps_type == 2:
                     _QMessageBox.warning(self, 'Warning',
@@ -370,7 +378,7 @@ class PowerSupplyWidget(_QDialog):
                         return
                 # Turn on Power Supply
                 _ps.SetSlaveAdd(_ps_type)  # Set power supply address
-                self.configure_pid()
+#                 self.configure_pid()
                 _ps.turn_on()
                 _sleep(1)
                 if not _ps.read_ps_onoff():
@@ -444,6 +452,12 @@ class PowerSupplyWidget(_QDialog):
             _ps.SetSlaveAdd(self.cfg.ps_type)
             _actual_current = round(float(_ps.read_iload1()), 3)
             self.ui.lcd_actual_current.display(_actual_current)
+
+            if self.parent_window.connection.ui.chb_multichannel_en.isChecked():
+                _dcct_current = self.mult.get_readings()[-1] * 4
+                self.ui.lcd_dcct_current.display(_dcct_current)
+
+            _QApplication.processEvents()
             return True
         except Exception:
             _traceback.print_exc(file=_sys.stdout)

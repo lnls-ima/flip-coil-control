@@ -23,6 +23,7 @@ from flipcoil.devices import (
     fdi as _fdi,
     ps as _ps,
     volt as _volt,
+    mult as _mult,
     )
 
 
@@ -47,6 +48,7 @@ class ConnectionWidget(_QWidget):
         """Create signal/slot connections."""
 #         pass
         self.ui.pbt_connect.clicked.connect(self.connect)
+        self.ui.pbt_disconnect.clicked.connect(self.disconnect)
 
     def update_serial_ports(self):
             """Update available serial ports."""
@@ -77,10 +79,19 @@ class ConnectionWidget(_QWidget):
             _fdi_inst = self.ui.cmb_integrator_inst.currentText()
             _agilent_addr = self.ui.sb_agilent_addr.value()
             _agilent_board = self.ui.sb_agilent_board.value()
-            _ppmac.connect(_ppmac_ip)
-            _ps.Connect(self.ui.cmb_ps_port.currentText())
+            _mult_addr = self.ui.sb_mult_addr.value()
+
+#             if self.ui.chb_integrator_en.isChecked():
 #             _fdi.inst = _fdi.rm.open_resource(_fdi_inst.encode())
-            _volt.connect(address=_agilent_addr, board=_agilent_board)
+            if self.ui.chb_ppmac_en.isChecked():
+                _ppmac.connect(_ppmac_ip)
+                _ppmac.ppmac.timeout = 3
+            if self.ui.chb_ps_en.isChecked():
+                _ps.Connect(self.ui.cmb_ps_port.currentText())
+            if self.ui.chb_voltmeter_en.isChecked():
+                _volt.connect(address=_agilent_addr, board=_agilent_board)
+            if self.ui.chb_multichannel_en.isChecked():
+                _mult.connect(_mult_addr)
             _QMessageBox.information(self, 'Information',
                                      'Devices connected.',
                                      _QMessageBox.Ok)
@@ -94,12 +105,18 @@ class ConnectionWidget(_QWidget):
             return False
 
     def disconnect(self):
-        """Disconnects all intruments."""
+        """Disconnects all instruments."""
         try:
-            _ppmac.disconnect()
-            _fdi.disconnect()
-            _volt.disconnect()
-            _ps.Disconnect()
+#             _fdi.disconnect()
+            if self.ui.chb_ppmac_en.isChecked():
+                _ppmac.disconnect()
+            if self.ui.chb_ps_en.isChecked():
+                _ps.turn_off()
+                _ps.Disconnect()
+            if self.ui.chb_voltmeter_en.isChecked():
+                _volt.disconnect()
+            if self.ui.chb_multichannel_en.isChecked():
+                _mult.disconnect()
             self.ui.pbt_connect.setEnabled(True)
             self.ui.pbt_disconnect.setEnabled(False)
             _QMessageBox.information(self, 'Information',

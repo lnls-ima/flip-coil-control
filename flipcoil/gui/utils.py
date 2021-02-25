@@ -120,11 +120,14 @@ def sleep(time):
 
     Args:
         time (float): time to halt the program in seconds."""
-    _dt = 0.1
-    _tf = _time.time() + time
-    while _time.time() < _tf:
-        _QApplication.processEvents()
-        _time.sleep(_dt)
+    try:
+        _dt = 0.1
+        _tf = _time.time() + time
+        while _time.time() < _tf:
+            _QApplication.processEvents()
+            _time.sleep(_dt)
+    except Exception:
+        _traceback.print_exc(file=_sys.stdout)
 
 
 def update_db_name_list(db, cmb):

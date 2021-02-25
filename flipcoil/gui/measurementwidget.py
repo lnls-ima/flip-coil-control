@@ -97,20 +97,23 @@ class MeasurementWidget(_QWidget):
             _frw_steps = [self.ui.sb_frw5.value(), self.ui.sb_frw6.value()]
             _bck_steps = [self.ui.sb_bck5.value(), self.ui.sb_bck6.value()]
 
-            with _ppmac.lock_ppmac:
-                _ppmac.write('#5j^' + str(_frw_steps[0]) +
-                             ';#6j^' + str(_frw_steps[1]))
+#             with _ppmac.lock_ppmac:
+            self.parent_window.motors.timer.stop()
+            _ppmac.write('#5j^' + str(_frw_steps[0]) +
+                         ';#6j^' + str(_frw_steps[1]))
             _sleep(5)
             pos7f, pos8f = _ppmac.read_motor_pos([7, 8])
-            with _ppmac.lock_ppmac:
-                _ppmac.write('#5j^' + str(_bck_steps[0]) +
-                             ';#6j^' + str(_bck_steps[1]))
+#             with _ppmac.lock_ppmac:
+            _ppmac.write('#5j^' + str(_bck_steps[0]) +
+                         ';#6j^' + str(_bck_steps[1]))
             print(pos7f, pos8f)
             _sleep(5)
             pos7b, pos8b = _ppmac.read_motor_pos([7, 8])
             print(pos7b, pos8b)
+            self.parent_window.motors.timer.start(1000)
         except Exception:
             _traceback.print_exc(file=_sys.stdout)
+            self.parent_window.motors.timer.start(1000)
 
     def update_cfg_list(self):
         """Updates configuration name list in combobox."""
@@ -299,26 +302,27 @@ class MeasurementWidget(_QWidget):
             self.meas.pos8f = _np.zeros((2, self.cfg.nmeasurements))
             self.meas.pos8b = _np.zeros((2, self.cfg.nmeasurements))
 
-            with _ppmac.lock_ppmac:
-                _ppmac.write('#1..4k')
-                _sleep(1)
-                self.meas.x_pos = (_ppmac.read_motor_pos([1, 3])[0] *
-                                   self.parent_window.motors.x_sf)
-                self.meas.y_pos = (_ppmac.read_motor_pos([2, 4])[0] *
-                                   self.parent_window.motors.y_sf)
+#             with _ppmac.lock_ppmac:
+            self.parent_window.motors.timer.stop()
+            _ppmac.write('#1..4k')
+            _sleep(1)
+            self.meas.x_pos = (_ppmac.read_motor_pos([1, 3])[0] *
+                               self.parent_window.motors.x_sf)
+            self.meas.y_pos = (_ppmac.read_motor_pos([2, 4])[0] *
+                               self.parent_window.motors.y_sf)
 
-    #             msg = ('startPos=' + str(start_pos) +
-    #                    ';Av=' + str(speed) + ';Aac=' + str(ta) +
-    #                    ';Aj=' + str(ts) + ';wait=' + str(wait))
-    #             _ppmac.write(msg)
-                msg = ('Motor[{0}].JogSpeed={1};'
-                       'Motor[{0}].JogTa={2};'
-                       'Motor[{0}].JogTs={3}'.format(5, speed, ta, ts))
-                _ppmac.write(msg)
-                msg = ('Motor[{0}].JogSpeed={1};'
-                       'Motor[{0}].JogTa={2};'
-                       'Motor[{0}].JogTs={3}'.format(6, speed, ta, ts))
-                _ppmac.write(msg)
+#             msg = ('startPos=' + str(start_pos) +
+#                    ';Av=' + str(speed) + ';Aac=' + str(ta) +
+#                    ';Aj=' + str(ts) + ';wait=' + str(wait))
+#             _ppmac.write(msg)
+            msg = ('Motor[{0}].JogSpeed={1};'
+                   'Motor[{0}].JogTa={2};'
+                   'Motor[{0}].JogTs={3}'.format(5, speed, ta, ts))
+            _ppmac.write(msg)
+            msg = ('Motor[{0}].JogSpeed={1};'
+                   'Motor[{0}].JogTa={2};'
+                   'Motor[{0}].JogTs={3}'.format(6, speed, ta, ts))
+            _ppmac.write(msg)
 
             if fdi_mode:
                 counts = _fdi.configure_integrator(time=self.cfg.duration,
@@ -348,9 +352,9 @@ class MeasurementWidget(_QWidget):
 
                 self.meas.pos7f[0, i], self.meas.pos8f[0, i] = (
                     _ppmac.read_motor_pos([7, 8]))
-                with _ppmac.lock_ppmac:
-                    _ppmac.write('#5j^' + str(self.cfg.steps_f[0]) +
-                                 ';#6j^' + str(self.cfg.steps_f[1]))
+#                 with _ppmac.lock_ppmac:
+                _ppmac.write('#5j^' + str(self.cfg.steps_f[0]) +
+                             ';#6j^' + str(self.cfg.steps_f[1]))
 
                 if fdi_mode:
                     while(_fdi.get_data_count() < counts - 1):
@@ -378,9 +382,9 @@ class MeasurementWidget(_QWidget):
 
                 self.meas.pos7b[0, i], self.meas.pos8b[0, i] = (
                     _ppmac.read_motor_pos([7, 8]))
-                with _ppmac.lock_ppmac:
-                    _ppmac.write('#5j^' + str(self.cfg.steps_b[0]) +
-                                 ';#6j^' + str(self.cfg.steps_b[1]))
+#                 with _ppmac.lock_ppmac:
+                _ppmac.write('#5j^' + str(self.cfg.steps_b[0]) +
+                             ';#6j^' + str(self.cfg.steps_b[1]))
                 if fdi_mode:
                     while(_fdi.get_data_count() < counts - 1):
                         _sleep(0.1)
@@ -419,6 +423,7 @@ class MeasurementWidget(_QWidget):
             self.parent_window.analysis.cmb_meas_name.setCurrentIndex(_count)
 #             self.parent_window.analysis.plot(plot_from_measurementwidget=True)
 
+            self.parent_window.motors.timer.start(1000)
             _prg_dialog.destroy()
             _QMessageBox.information(self, 'Information',
                                      'Measurement Finished.',
@@ -430,6 +435,7 @@ class MeasurementWidget(_QWidget):
             _QMessageBox.information(self, 'Warning',
                                      'Measurement Failed.',
                                      _QMessageBox.Ok)
+            self.parent_window.motors.timer.start(1000)
             return False
 
     def save_measurement(self):

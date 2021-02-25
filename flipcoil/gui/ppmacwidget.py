@@ -263,6 +263,7 @@ class PpmacWidget(_QWidget):
             else:
                 _ta_y = 0
 
+            self.timer.stop()
             # Configures rotation motors:
             for i in [5, 6]:
                 if i == 5:
@@ -274,26 +275,28 @@ class PpmacWidget(_QWidget):
                        'Motor[{0}].JogTs={3};'
                        'Motor[{0}].HomeOffset={4}'.format(i, _spd, _ta, _ts,
                                                           _home_offset))
-                with _ppmac.lock_ppmac:
-                    _ppmac.write(msg)
+#                 with _ppmac.lock_ppmac:
+                _ppmac.write(msg)
 
             # Configures X motors:
             for i in [1, 3]:
                 msg = ('Motor[{0}].JogSpeed={1};'
                        'Motor[{0}].JogTa={2};'
                        'Motor[{0}].JogTs={3}'.format(i, _spd_x, _ta_x, _ts_x))
-                with _ppmac.lock_ppmac:
-                    _ppmac.write(msg)
+#                 with _ppmac.lock_ppmac:
+                _ppmac.write(msg)
 
             # Configures Y motors:
             for i in [2, 4]:
                 msg = ('Motor[{0}].JogSpeed={1};'
                        'Motor[{0}].JogTa={2};'
                        'Motor[{0}].JogTs={3}'.format(i, _spd_x, _ta_x, _ts_x))
-                with _ppmac.lock_ppmac:
-                    _ppmac.write(msg)
+#                 with _ppmac.lock_ppmac:
+                _ppmac.write(msg)
+                self.timer.start(1000)
         except Exception:
             _traceback.print_exc(file=_sys.stdout)
+            self.timer.start(1000)
 
     def home(self):
         """Home rotation motors.
@@ -302,22 +305,26 @@ class PpmacWidget(_QWidget):
             True if successfull;
             False otherwise."""
         try:
+            self.timer.stop()
             _home5 = self.cfg.home_offset5
             _home6 = self.cfg.home_offset6
             _msg = 'Motor[7].HomeOffset={0};Motor[8].HomeOffset={1}'.format(
                 _home5, _home6)
-            with _ppmac.lock_ppmac:
-                _ppmac.write(_msg)
-                _ppmac.write('enable plc HomeA')
+#             with _ppmac.lock_ppmac:
+            _ppmac.write(_msg)
+            _ppmac.write('enable plc HomeA')
             _sleep(3)
-#             while (all([not _ppmac.motor_homed(5),
-#                         not _ppmac.motor_homed(6)])):
-#                 _sleep(1)
+            while (all([not _ppmac.motor_homed(5),
+                        not _ppmac.motor_homed(6)])):
+                _sleep(1)
+            self.ppmac.remove_backlash(0)
 #             self.ui.chb_homed.setChecked(True)
+            self.timer.start(1000)
             return True
         except Exception:
             self.ui.chb_homed.setChecked(False)
             _traceback.print_exc(file=_sys.stdout)
+            self.timer.start(1000)
             return False
 
     def home_x(self):
@@ -327,18 +334,21 @@ class PpmacWidget(_QWidget):
             True if successfull;
             False otherwise."""
         try:
-            with _ppmac.lock_ppmac:
-                _ppmac.write('#1,3j/')
-                _ppmac.write('enable plc HomeX')
+            self.timer.stop()
+#             with _ppmac.lock_ppmac:
+            _ppmac.write('#1,3j/')
+            _ppmac.write('enable plc HomeX')
             _sleep(3)
 #             while (all([not _ppmac.motor_homed(1),
 #                         not _ppmac.motor_homed(3)])):
 #                 _sleep(1)
 #             self.ui.chb_homed_x.setChecked(True)
+            self.timer.start(1000)
             return True
         except Exception:
             self.ui.chb_homed_x.setChecked(False)
             _traceback.print_exc(file=_sys.stdout)
+            self.timer.start(1000)
             return False
 
     def home_y(self):
@@ -348,10 +358,12 @@ class PpmacWidget(_QWidget):
             True if successfull;
             False otherwise"""
         try:
-            with _ppmac.lock_ppmac:
-                _ppmac.write('#2,4j/')
-                _ppmac.write('enable plc HomeY')
+            self.timer.stop()
+#             with _ppmac.lock_ppmac:
+            _ppmac.write('#2,4j/')
+            _ppmac.write('enable plc HomeY')
             _sleep(3)
+            self.timer.start(1000)
 #             while (all([not _ppmac.motor_homed(2),
 #                         not _ppmac.motor_homed(4)])):
 #                 _sleep(1)
@@ -360,6 +372,7 @@ class PpmacWidget(_QWidget):
         except Exception:
             self.ui.chb_homed_y.setChecked(False)
             _traceback.print_exc(file=_sys.stdout)
+            self.timer.start(1000)
             return False
 
     def move(self):
@@ -370,11 +383,14 @@ class PpmacWidget(_QWidget):
                 _mode = '='
             else:
                 _mode = '^'
-            with _ppmac.lock_ppmac:
-                _ppmac.write('#5j' + _mode + str(_steps[0]) +
-                             ';#6j' + _mode + str(_steps[1]))
+#             with _ppmac.lock_ppmac:
+            self.timer.stop()
+            _ppmac.write('#5j' + _mode + str(_steps[0]) +
+                         ';#6j' + _mode + str(_steps[1]))
+            self.timer.start(1000)
         except Exception:
             _traceback.print_exc(file=_sys.stdout)
+            self.timer.start(1000)
 
     def move_xy(self):
         """Move X and Y motors."""
@@ -407,12 +423,15 @@ class PpmacWidget(_QWidget):
             else:
                 _mode = '^'
 
-            with _ppmac.lock_ppmac:
-                _ppmac.write('#1..4j/')
-                _msg_x = '#1,3j' + _mode + str(_pos_x)
-                _msg_y = '#2,4j' + _mode + str(_pos_y)
-                _ppmac.write(_msg_x + ';' + _msg_y)
+#             with _ppmac.lock_ppmac:
+            self.timer.stop()
+            _ppmac.write('#1..4j/')
+            _msg_x = '#1,3j' + _mode + str(_pos_x)
+            _msg_y = '#2,4j' + _mode + str(_pos_y)
+            _ppmac.write(_msg_x + ';' + _msg_y)
+            self.timer.start(1000)
 
             return True
         except Exception:
             _traceback.print_exc(file=_sys.stdout)
+            self.timer.start(1000)
