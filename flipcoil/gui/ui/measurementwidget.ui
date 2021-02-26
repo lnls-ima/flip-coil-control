@@ -154,7 +154,7 @@
           <item row="0" column="0" colspan="2" alignment="Qt::AlignHCenter">
            <widget class="QLabel" name="label_6">
             <property name="text">
-             <string>Motor5</string>
+             <string>Motor A</string>
             </property>
            </widget>
           </item>
@@ -205,7 +205,7 @@
           <item row="0" column="0" colspan="2" alignment="Qt::AlignHCenter">
            <widget class="QLabel" name="label_9">
             <property name="text">
-             <string>Motor6</string>
+             <string>Motor B</string>
             </property>
            </widget>
           </item>
