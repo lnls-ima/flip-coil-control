@@ -65,6 +65,9 @@ class AnalysisWidget(_QWidget):
         self.connect_signal_slots()
         self.update_meas_list()
 
+    def init_tab(self):
+        self.load_measurement()
+
     @property
     def database_name(self):
         """Database name."""

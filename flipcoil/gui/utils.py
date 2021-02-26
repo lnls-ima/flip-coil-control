@@ -154,6 +154,17 @@ def update_db_name_list(db, cmb):
     except Exception:
         _traceback.print_exc(file=_sys.stdout)
 
+def load_db_from_name(db, name):
+    try:
+        db.db_update_database(
+            database_name=_QApplication.instance().database_name,
+            mongo=_QApplication.instance().mongo,
+            server=_QApplication.instance().server)
+        _id = db.db_search_field('name', name)[0]['id']
+        db.db_read(_id)
+    except Exception:
+        _traceback.print_exc(file=_sys.stdout)
+
 # def plot_item_add_first_right_axis(plot_item):
 #     """Add axis to graph."""
 #     plot_item.showAxis('right')

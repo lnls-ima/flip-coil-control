@@ -284,6 +284,54 @@ class Ppmac(Ppmac_eth):
             _traceback.print_exc(file=_sys.stdout)
             return None
 
+    def align_motors(self, limit=2, max_tries=100):
+        try:
+            sf = 102400/360000  # [steps/mdeg]
+    #         limit = cfg.max_pos_error
+            p_list = self.read_motor_pos([7, 8])
+            steps = _np.array([1000, -1000]) - 1*sf*p_list
+            self.write('#5j^{0};#6j^{1}'.format(steps))
+            _sleep(0.1)
+            while not self.motor_stopped(5):
+                _sleep(0.1)
+            p_list = self.read_motor_pos([7, 8])
+            p_sign_init = _np.sign(p_list)
+
+            while all([not -1*limit <= p_list[0] <= limit,
+                       not -1*limit <= p_list[1] <= limit,
+                       max_tries > 0]):
+                max_tries -= 1
+                p_list = self.read_motor_pos([7, 8])
+                steps = -1*sf*p_list
+                for i in range(len(steps)):
+                    if steps[i] < 5:
+                        steps[i] = 1
+                self.write('#5j^{0};#6j^{1}'.format(steps))
+                _sleep(0.1)
+                while not self.motor_stopped(5):
+                    _sleep(0.1)
+                _sleep(1)
+                p_list = self.read_motor_pos([7, 8])
+                p_sign = _np.sign(p_list)
+                if all([not -1*limit <= p_list[0] <= limit,
+                        not -1*limit <= p_list[1] <= limit,
+                        not p_sign == p_sign_init]):
+                    steps = _np.array([1000, -1000]) - 1*sf*p_list
+                    self.write('#5j^{0};#6j^{1}'.format(steps))
+                    _sleep(0.1)
+                    while not self.motor_stopped(5):
+                        _sleep(0.1)
+                    p_list = self.read_motor_pos([7, 8])
+                    p_sign_init = _np.sign(p_list)
+
+            if max_tries > 0:
+                return True
+            else:
+                return False
+
+        except Exception:
+            _traceback.print_exc(file=_sys.stdout)
+            return False
 
 #     def remove_backlash2(self, target_pos=0, elim=2, ccw=1, max_tries=100,
 #                          bck_steps=1000):

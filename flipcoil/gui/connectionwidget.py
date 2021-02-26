@@ -44,6 +44,9 @@ class ConnectionWidget(_QWidget):
         self.update_serial_ports()
         self.ui.cmb_ps_port.setCurrentText('COM6')
 
+    def init_tab(self):
+        pass
+
     def connect_signal_slots(self):
         """Create signal/slot connections."""
 #         pass

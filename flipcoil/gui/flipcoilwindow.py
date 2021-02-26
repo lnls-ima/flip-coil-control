@@ -73,6 +73,9 @@ class FlipCoilWindow(_QMainWindow):
             self.ui.twg_main.addTab(tab, tab_name.capitalize())
             setattr(tab, 'parent_window', self)
 
+        for tab in self.tab_widgets:
+            tab.init_tab()
+
     def centralize_window(self):
         """Centralize window."""
         window_center = _QDesktopWidget().availableGeometry().center()

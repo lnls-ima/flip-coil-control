@@ -19,6 +19,7 @@ from flipcoil.gui.utils import (
     get_ui_file as _get_ui_file,
     sleep as _sleep,
     update_db_name_list as _update_db_name_list,
+    load_db_from_name as _load_db_from_name,
     )
 
 from flipcoil.devices import (
@@ -46,6 +47,11 @@ class PowerSupplyWidget(_QDialog):
 
         self.connect_signal_slots()
         self.update_cfg_list()
+
+    def init_tab(self):
+        name = self.ui.cmb_cfg_name.currentText()
+        _load_db_from_name(self.cfg, name)
+        self.load_cfg_into_ui()
 
     @property
     def database_name(self):
