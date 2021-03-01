@@ -442,3 +442,4 @@ class PpmacWidget(_QWidget):
         except Exception:
             _traceback.print_exc(file=_sys.stdout)
             self.timer.start(1000)
+            return False

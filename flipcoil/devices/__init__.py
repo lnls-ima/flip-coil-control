@@ -187,7 +187,8 @@ class Ppmac(Ppmac_eth):
             _sleep(0.1)
             ans = self.read()
             ans1 = ans.split(msg)[-1].strip('\r\n\x06').split(' ')
-            return [float(val) for val in ans1]
+            pos = _np.array([float(val) for val in ans1])
+            return pos
         except Exception:
             _traceback.print_exc(file=_sys.stdout)
             return None

@@ -54,9 +54,14 @@ class MeasurementWidget(_QWidget):
         self.connect_signal_slots()
 
     def init_tab(self):
+        self.motors = self.parent_window.motors
+        self.analysis = self.parent_window.analysis
+        self.ps = self.parent_window.powersupply
+
         name = self.ui.cmb_cfg_name.currentText()
         _load_db_from_name(self.cfg, name)
         self.load_cfg_into_ui()
+
 #         self.load_cfg()
 
     @property
@@ -108,7 +113,7 @@ class MeasurementWidget(_QWidget):
             _bck_steps = [self.ui.sb_bck5.value(), self.ui.sb_bck6.value()]
 
 #             with _ppmac.lock_ppmac:
-            self.parent_window.motors.timer.stop()
+            self.motors.timer.stop()
             _ppmac.write('#5j^' + str(_frw_steps[0]) +
                          ';#6j^' + str(_frw_steps[1]))
             _sleep(5)
@@ -120,10 +125,10 @@ class MeasurementWidget(_QWidget):
             _sleep(5)
             pos7b, pos8b = _ppmac.read_motor_pos([7, 8])
             print(pos7b, pos8b)
-            self.parent_window.motors.timer.start(1000)
+            self.motors.timer.start(1000)
         except Exception:
             _traceback.print_exc(file=_sys.stdout)
-            self.parent_window.motors.timer.start(1000)
+            self.motors.timer.start(1000)
 
     def update_cfg_list(self):
         """Updates configuration name list in combobox."""
@@ -153,16 +158,16 @@ class MeasurementWidget(_QWidget):
             self.cfg.start_pos = self.ui.dsp_start_pos.value()  # [deg]
             self.cfg.nmeasurements = self.ui.sb_nmeasurements.value()
             self.cfg.max_init_error = (
-                self.parent_window.motors.ui.sb_rot_max_err.value())
+                self.motors.ui.sb_rot_max_err.value())
 
             self.cfg.nplc = self.ui.sb_nplc.value()
             self.cfg.duration = self.ui.dsb_duration.value()
 
             self.cfg.width = self.ui.dsb_width.value() * 10**-3  # [m]
             self.cfg.turns = self.ui.sb_turns.value()
-            self.cfg.speed = self.parent_window.motors.ui.dsb_speed.value()  # [turns/s]
-            self.cfg.accel = self.parent_window.motors.ui.dsb_accel.value()  # [turns/s^2]
-            self.cfg.jerk = self.parent_window.motors.ui.dsb_jerk.value()  # [turns/s^3]
+            self.cfg.speed = self.motors.ui.dsb_speed.value()  # [turns/s]
+            self.cfg.accel = self.motors.ui.dsb_accel.value()  # [turns/s^2]
+            self.cfg.jerk = self.motors.ui.dsb_jerk.value()  # [turns/s^3]
 
             return True
         except Exception:
@@ -226,7 +231,7 @@ class MeasurementWidget(_QWidget):
                 self.ui.rdb_cw.setChecked(True)
             self.ui.dsp_start_pos.setValue(self.cfg.start_pos)  # [deg]
             self.ui.sb_nmeasurements.setValue(self.cfg.nmeasurements)
-            self.parent_window.motors.ui.sb_rot_max_err.setValue(
+            self.motors.ui.sb_rot_max_err.setValue(
                 self.cfg.max_init_error)
 
             self.ui.sb_nplc.setValue(self.cfg.nplc)
@@ -234,9 +239,9 @@ class MeasurementWidget(_QWidget):
 
             self.ui.dsb_width.setValue(self.cfg.width * 10**3)  # [mm]
             self.ui.sb_turns.setValue(self.cfg.turns)
-            self.parent_window.motors.ui.dsb_speed.setValue(self.cfg.speed)  # [rev/s]
-            self.parent_window.motors.ui.dsb_accel.setValue(self.cfg.accel)  # [rev/s^2]
-            self.parent_window.motors.ui.dsb_jerk.setValue(self.cfg.jerk)  # [rev/s^3]
+            self.motors.ui.dsb_speed.setValue(self.cfg.speed)  # [rev/s]
+            self.motors.ui.dsb_accel.setValue(self.cfg.accel)  # [rev/s^2]
+            self.motors.ui.dsb_jerk.setValue(self.cfg.jerk)  # [rev/s^3]
             _QApplication.processEvents()
         except Exception:
             _traceback.print_exc(file=_sys.stdout)
@@ -245,11 +250,20 @@ class MeasurementWidget(_QWidget):
         """Creates measurement dialog."""
         self.dialog = _MeasurementDialog()
         self.dialog.show()
-        self.dialog.accepted.connect(self.measure_first_integral)
+        self.dialog.accepted.connect(self.start_measurement)
         self.dialog.rejected.connect(self.cancel_measurement)
 
         try:
-            _update_db_name_list(self.meas, self.dialog.ui.cmb_meas_name)
+            self.meas.db_update_database(self.database_name, mongo=self.mongo,
+                                         server=self.server)
+            last_id = self.meas.db_get_last_id()
+            name = '_'.join(
+                self.meas.db_get_value('name', last_id).split('_')[:-3])
+            self.dialog.ui.le_meas_name.setText(name)
+
+            comments = self.meas.db_get_value('comments', last_id)
+            self.dialog.ui.le_comments.setText(comments)
+#             _update_db_name_list(self.meas, self.dialog.ui.cmb_meas_name)
 #             self.meas.db_update_database(database_name=self.database_name,
 #                                          mongo=self.mongo, server=self.server)
 #             _idn = self.meas.db_get_last_id()
@@ -275,6 +289,132 @@ class MeasurementWidget(_QWidget):
         """Cancels measurement and destroys measurement dialog."""
         self.dialog.destroy()
 
+    def start_measurement(self):
+        """Starts measurement or scan according to configurations. If number
+        of measurements > 1, each step in a scan will be repeated before
+        changing the setpoint."""
+
+        try:
+            self.update_cfg_from_ui()
+            scan_flag = self.dialog.ui.chb_scan.isChecked()
+            repeats = self.dialog.ui.sb_repetitions.value()
+
+            if not scan_flag:
+                # update meas.name and meas.comments
+                self.meas.comments = self.dialog.ui.le_comments.text()
+
+                # measure
+                for i in range(repeats):
+                    name = self.dialog.ui.le_meas_name.text()
+                    name = (name + '_' + self.cfg.direction +
+                            _time.strftime('_%y%m%d_%H%M'))
+                    self.meas.hour = _time.strftime('%H:%M:%S')
+                    self.meas.name = name
+                    self.measure_first_integral()
+
+            if scan_flag:
+                param = self.dialog.ui.cmb_scan_param.currentText()
+                start = self.dialog.ui.dsb_scan_start.value()
+                end = self.dialog.ui.dsb_scan_end.value()
+                step = self.dialog.ui.dsb_scan_step.value()
+                n_steps = int(1 + _np.ceil((end-start)/step))  # number of steps
+
+                for i in range(n_steps):
+                    # change setpoint
+                    setpoint = start + i * step
+                    if i == n_steps - 1:
+                        setpoint = end
+
+                    if 'X' in param:
+                        p_str = '_X={0:.2f}_'.format(setpoint)
+                        _x_lim = [self.ui.dsb_min_x.value()*10**3,
+                                  self.ui.dsb_max_x.value()*10**3]
+                        if _x_lim[0] <= setpoint <= _x_lim[1]:
+                            self.motors.ui.dsb_pos_x.setValue(setpoint)
+                            self.motors.move_xy()
+                            _sleep(10)
+                        else:
+                            _QMessageBox.information(self, 'Warning',
+                                                     'X out of range.',
+                                                     _QMessageBox.Ok)
+                            raise ValueError
+                    if 'Y' in param:
+                        p_str = '_Y={0:.2f}_'.format(setpoint)
+                        _y_lim = [self.ui.dsb_min_y.value()*10**3,
+                                  self.ui.dsb_max_y.value()*10**3]
+                        if _y_lim[0] <= setpoint <= _y_lim[1]:
+                            self.motors.ui.dsb_pos_y.setValue(setpoint)
+                            self.motors.move_xy()
+                            _sleep(10)
+                        else:
+                            _QMessageBox.information(self, 'Warning',
+                                                     'Y out of range.',
+                                                     _QMessageBox.Ok)
+                            raise ValueError
+                    if 'Speed' in param:
+                        p_str = '_Spd={0:.2f}_'.format(setpoint)
+                        self.cfg.speed = setpoint
+                    if 'Acceleration' in param:
+                        p_str = '_Acc={0:.2f}_'.format(setpoint)
+                        self.cfg.accel = setpoint
+                    if 'Jerk' in param:
+                        p_str = '_Jrk={0:.2f}_'.format(setpoint)
+                        self.cfg.jerk = setpoint
+                    if 'Current' in param:
+                        p_str = '_I={0:.2f}_'.format(setpoint)
+                        if self.ps.ps.read_ps_onoff():
+                            self.ps.ui.dsb_current_setpoint.setValue(setpoint)
+                            _min = self.ps.cfg.min_current
+                            _max = self.ps.cfg.max_current
+                            if _min <= setpoint <= _max:
+                                self.ps.ps.set_slowref(setpoint)
+                                _sleep(10)
+                            else:
+                                _QMessageBox.information(self, 'Warning',
+                                                         'Current out of '
+                                                         'range.',
+                                                         _QMessageBox.Ok)
+                                raise ValueError
+                        else:
+                            _QMessageBox.information(self, 'Warning',
+                                                     'Power supply is'
+                                                     ' turned off.',
+                                                     _QMessageBox.Ok)
+                            return False
+
+                    # update meas.name, meas.comments:
+                    comments = self.dialog.ui.le_comments.text()
+                    comments = comments + ' Scan: ' + p_str.strip('_') + '.'
+                    self.meas.comments = comments
+
+                    # measure
+                    for i in range(repeats):
+                        name = self.dialog.ui.le_meas_name.text()
+                        name = (name + '_' + self.cfg.direction + p_str +
+                                _time.strftime('_%y%m%d_%H%M'))
+                        self.meas.hour = _time.strftime('%H:%M:%S')
+                        self.meas.name = name
+
+                        self.measure_first_integral()
+
+                if 'Current' in param:
+                    self.ps.ui.dsb_current_setpoint.setValue(setpoint)
+                    self.ps.ps.set_slowref(setpoint)
+                    _sleep(5)
+                    self.ps.ps.turn_off()
+
+            _QMessageBox.information(self, 'Information',
+                                     'Measurement Finished.',
+                                     _QMessageBox.Ok)
+            return True
+
+        except Exception:
+            _traceback.print_exc(file=_sys.stdout)
+            _QMessageBox.information(self, 'Warning',
+                                     'Measurement Failed.',
+                                     _QMessageBox.Ok)
+            return False
+
     def measure_first_integral(self, fdi_mode=False):
         """Runs first field integral measurement.
 
@@ -284,9 +424,9 @@ class MeasurementWidget(_QWidget):
         """
         try:
             _ppmac.flag_abort = False
-            self.update_cfg_from_ui()
+#             self.update_cfg_from_ui()
 
-            self.meas.comments = self.dialog.ui.te_comments.toPlainText()
+#             self.meas.comments = self.dialog.ui.te_comments.toPlainText()
             if self.dialog.ui.chb_Iamb.isChecked():
                 self.meas.Iamb_id = 0
             else:
@@ -294,7 +434,7 @@ class MeasurementWidget(_QWidget):
                 self.meas.Iamb_id = self.dialog.amb_list[_id]['id']
             self.meas.cfg_id = self.ui.cmb_cfg_name.currentIndex() + 1
 
-            ppmac_cfg = self.parent_window.motors.cfg
+            ppmac_cfg = self.motors.cfg
             speed = self.cfg.speed * ppmac_cfg.steps_per_turn * 10**-3  # [turns/s]
             if self.cfg.accel != 0:
                 ta = -1/self.cfg.accel * 1/ppmac_cfg.steps_per_turn * 10**6  # [turns/s^2]
@@ -316,27 +456,29 @@ class MeasurementWidget(_QWidget):
             _prg_dialog.show()
             _QApplication.processEvents()
 
-            repeats = self.dialog.ui.sb_repetitions.value()
-            auto_current = self.dialog.ui.chb_auto_current.isChecked()
-            if auto_current:
-                currents = _np.copy(
-                    self.parent_window.powersupply.cfg.current_array)
-                if len(currents) == 0:
-                    auto_current = False
+            data_frw = _np.array([])
+            data_bck = _np.array([])
+            self.meas.pos7f = _np.zeros((2, self.cfg.nmeasurements))
+            self.meas.pos7b = _np.zeros((2, self.cfg.nmeasurements))
+            self.meas.pos8f = _np.zeros((2, self.cfg.nmeasurements))
+            self.meas.pos8b = _np.zeros((2, self.cfg.nmeasurements))
+
+#             auto_current = self.dialog.ui.chb_auto_current.isChecked()
+#             if auto_current:
+#                 currents = _np.copy(
+#                     self.ps.cfg.current_array)
+#                 if len(currents) == 0:
+#                     auto_current = False
 
 #             with _ppmac.lock_ppmac:
-            self.parent_window.motors.timer.stop()
+            self.motors.timer.stop()
             _ppmac.write('#1..4k')
             _sleep(1)
-            self.meas.x_pos = (_ppmac.read_motor_pos([1, 3])[0] *
-                               self.parent_window.motors.x_sf)
-            self.meas.y_pos = (_ppmac.read_motor_pos([2, 4])[0] *
-                               self.parent_window.motors.y_sf)
+            self.meas.x_pos = (_ppmac.read_motor_pos([1, 3]) *
+                               self.motors.x_sf)
+            self.meas.y_pos = (_ppmac.read_motor_pos([2, 4]) *
+                               self.motors.y_sf)
 
-#             msg = ('startPos=' + str(start_pos) +
-#                    ';Av=' + str(speed) + ';Aac=' + str(ta) +
-#                    ';Aj=' + str(ts) + ';wait=' + str(wait))
-#             _ppmac.write(msg)
             msg = ('Motor[{0}].JogSpeed={1};'
                    'Motor[{0}].JogTa={2};'
                    'Motor[{0}].JogTs={3}'.format(5, speed, ta, ts))
@@ -356,110 +498,107 @@ class MeasurementWidget(_QWidget):
             _sleep(0.5)
 #             _ppmac.remove_backlash(start_pos)
 #             _sleep(10)
-            for _ in range(repeats):
-                self.meas.name = (self.dialog.ui.cmb_meas_name.currentText() +
-                                  _time.strftime('_%y%m%d_%H%M'))
-                data_frw = _np.array([])
-                data_bck = _np.array([])
-                self.meas.pos7f = _np.zeros((2, self.cfg.nmeasurements))
-                self.meas.pos7b = _np.zeros((2, self.cfg.nmeasurements))
-                self.meas.pos8f = _np.zeros((2, self.cfg.nmeasurements))
-                self.meas.pos8b = _np.zeros((2, self.cfg.nmeasurements))
-                _prg_dialog.setValue(0)
-                for i in range(self.cfg.nmeasurements):
-                    if _prg_dialog.wasCanceled():
-                        _prg_dialog.destroy()
-                        _ppmac.flag_abort = True
-                        return False
+#             self.meas.name = (self.dialog.ui.le_meas_name.currentText() +
+#                               _time.strftime('_%y%m%d_%H%M'))
+            _prg_dialog.setValue(0)
+            for i in range(self.cfg.nmeasurements):
+                if _prg_dialog.wasCanceled():
+                    _prg_dialog.destroy()
+                    _ppmac.flag_abort = True
+                    return False
 
-                    if (self.flag_rm_backlash and
-                        any([abs(_ppmac.read_motor_pos([7])[0]) % 360000 > self.cfg.max_init_error,
-                             abs(_ppmac.read_motor_pos([8])[0]) % 360000 > self.cfg.max_init_error])):
-                        _ppmac.remove_backlash(start_pos)
-                    if fdi_mode:
-                        _fdi.start_measurement()
-                    else:
-                        _volt.start_measurement()
-                    _sleep(1)
+                if (self.flag_rm_backlash and
+                    any([abs(_ppmac.read_motor_pos([7])[0]) % 360000 > self.cfg.max_init_error,
+                         abs(_ppmac.read_motor_pos([8])[0]) % 360000 > self.cfg.max_init_error])):
+                    _ppmac.remove_backlash(start_pos)
+                if fdi_mode:
+                    _fdi.start_measurement()
+                else:
+                    _volt.start_measurement()
+                _sleep(1)
 
-                    self.meas.pos7f[0, i], self.meas.pos8f[0, i] = (
-                        _ppmac.read_motor_pos([7, 8]))
-    #                 with _ppmac.lock_ppmac:
-                    _ppmac.write('#5j^' + str(self.cfg.steps_f[0]) +
-                                 ';#6j^' + str(self.cfg.steps_f[1]))
+                self.meas.pos7f[0, i], self.meas.pos8f[0, i] = (
+                    _ppmac.read_motor_pos([7, 8]))
+#                 with _ppmac.lock_ppmac:
+                _ppmac.write('#5j^' + str(self.cfg.steps_f[0]) +
+                             ';#6j^' + str(self.cfg.steps_f[1]))
 
-                    if fdi_mode:
-                        while(_fdi.get_data_count() < counts - 1):
-                            _sleep(0.1)
-                        _data = _fdi.get_data()
-                    else:
-                        _sleep(3)
-            #             while(volt.get_data_count() < counts):
-            #                 _sleep(0.1)
-                        _data = _volt.get_readings_from_memory(5)
-                    if i == 0:
-                        data_frw = _np.append(data_frw, _data)
-                    else:
-                        data_frw = _np.vstack([data_frw, _data])
-                    self.meas.pos7f[1, i], self.meas.pos8f[1, i] = (
-                        _ppmac.read_motor_pos([7, 8]))
+                if fdi_mode:
+                    while(_fdi.get_data_count() < counts - 1):
+                        _sleep(0.1)
+                    _data = _fdi.get_data()
+                else:
+                    _sleep(3)
+        #             while(volt.get_data_count() < counts):
+        #                 _sleep(0.1)
+                    _data = _volt.get_readings_from_memory(5)
+                if i == 0:
+                    data_frw = _np.append(data_frw, _data)
+                else:
+                    data_frw = _np.vstack([data_frw, _data])
+                self.meas.pos7f[1, i], self.meas.pos8f[1, i] = (
+                    _ppmac.read_motor_pos([7, 8]))
 
-                    _sleep(10)
+                _sleep(10)
 
-                    if fdi_mode:
-                        _fdi.start_measurement()
-                    else:
-                        _volt.start_measurement()
-                    _sleep(1)
+                if fdi_mode:
+                    _fdi.start_measurement()
+                else:
+                    _volt.start_measurement()
+                _sleep(1)
 
-                    self.meas.pos7b[0, i], self.meas.pos8b[0, i] = (
-                        _ppmac.read_motor_pos([7, 8]))
-    #                 with _ppmac.lock_ppmac:
-                    _ppmac.write('#5j^' + str(self.cfg.steps_b[0]) +
-                                 ';#6j^' + str(self.cfg.steps_b[1]))
-                    if fdi_mode:
-                        while(_fdi.get_data_count() < counts - 1):
-                            _sleep(0.1)
-                        _data = _fdi.get_data()
-                        _fdi.send('INP:COUP GND')
-                    else:
-                        _sleep(3)
-            #             while(volt.get_data_count() < counts):
-            #                 time.sleep(0.1)
-                        _data = _volt.get_readings_from_memory(5)
-                    if i == 0:
-                        data_bck = _np.append(data_bck, _data)
-                    else:
-                        data_bck = _np.vstack([data_bck, _data])
-                    self.meas.pos7b[1, i], self.meas.pos8b[1, i] = (
-                        _ppmac.read_motor_pos([7, 8]))
+                self.meas.pos7b[0, i], self.meas.pos8b[0, i] = (
+                    _ppmac.read_motor_pos([7, 8]))
+#                 with _ppmac.lock_ppmac:
+                _ppmac.write('#5j^' + str(self.cfg.steps_b[0]) +
+                             ';#6j^' + str(self.cfg.steps_b[1]))
+                if fdi_mode:
+                    while(_fdi.get_data_count() < counts - 1):
+                        _sleep(0.1)
+                    _data = _fdi.get_data()
+                    _fdi.send('INP:COUP GND')
+                else:
+                    _sleep(3)
+        #             while(volt.get_data_count() < counts):
+        #                 time.sleep(0.1)
+                    _data = _volt.get_readings_from_memory(5)
+                if i == 0:
+                    data_bck = _np.append(data_bck, _data)
+                else:
+                    data_bck = _np.vstack([data_bck, _data])
+                self.meas.pos7b[1, i], self.meas.pos8b[1, i] = (
+                    _ppmac.read_motor_pos([7, 8]))
 
-                    _prg_dialog.setValue(i+1)
+                _prg_dialog.setValue(i+1)
 
-                self.meas.data_frw = data_frw.transpose()
-                self.meas.data_bck = data_bck.transpose()
+            self.meas.data_frw = data_frw.transpose()
+            self.meas.data_bck = data_bck.transpose()
 
-                if self.flag_save:
-                    self.save_log(self.meas.data_frw, 'frw', 'Flip Coil')
-                    self.save_log(self.meas.data_bck, 'bck', 'Flip Coil')
-                    self.save_log(self.meas.pos7f, 'pos7f')
-                    self.save_log(self.meas.pos8f, 'pos8f')
-                    self.save_log(self.meas.pos7b, 'pos7b')
-                    self.save_log(self.meas.pos8b, 'pos8b')
+            if self.flag_save:
+                self.save_log(self.meas.data_frw, 'frw', 'Flip Coil')
+                self.save_log(self.meas.data_bck, 'bck', 'Flip Coil')
+                self.save_log(self.meas.pos7f, 'pos7f')
+                self.save_log(self.meas.pos8f, 'pos8f')
+                self.save_log(self.meas.pos7b, 'pos7b')
+                self.save_log(self.meas.pos8b, 'pos8b')
 
-                self.meas = self.parent_window.analysis.first_integral_calculus(
-                    cfg=self.cfg, meas=self.meas)
-                self.save_measurement()
-                self.parent_window.analysis.update_meas_list()
-                _count = self.parent_window.analysis.cmb_meas_name.count() - 1
-                self.parent_window.analysis.cmb_meas_name.setCurrentIndex(_count)
-#             self.parent_window.analysis.plot(plot_from_measurementwidget=True)
-
-            self.parent_window.motors.timer.start(1000)
-            _prg_dialog.destroy()
-            _QMessageBox.information(self, 'Information',
-                                     'Measurement Finished.',
+            _meas = self.analysis.first_integral_calculus(
+                cfg=self.cfg, meas=self.meas)
+            if _meas is not None:
+                self.meas = _meas
+            else:
+                _QMessageBox.warning(self, 'Warning',
+                                     'Calculations failed.',
                                      _QMessageBox.Ok)
+                return False
+            self.save_measurement()
+            self.analysis.update_meas_list()
+            _count = self.analysis.cmb_meas_name.count() - 1
+            self.analysis.cmb_meas_name.setCurrentIndex(_count)
+#             self.analysis.plot(plot_from_measurementwidget=True)
+
+            self.motors.timer.start(1000)
+            _prg_dialog.destroy()
             return True
 
         except Exception:
@@ -467,7 +606,7 @@ class MeasurementWidget(_QWidget):
             _QMessageBox.information(self, 'Warning',
                                      'Measurement Failed.',
                                      _QMessageBox.Ok)
-            self.parent_window.motors.timer.start(1000)
+            self.motors.timer.start(1000)
             return False
 
     def save_measurement(self):
@@ -477,7 +616,7 @@ class MeasurementWidget(_QWidget):
                         self.database_name,
                         mongo=self.mongo, server=self.server)
             self.meas.db_save()
-            self.parent_window.analysis.update_meas_list()
+            self.analysis.update_meas_list()
             return True
         except Exception:
             _QMessageBox.warning(self, 'Information',

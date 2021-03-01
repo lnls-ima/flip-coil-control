@@ -261,9 +261,7 @@ class AnalysisWidget(_QWidget):
                     self.database_name,
                     mongo=self.mongo, server=self.server)
 
-                self.amb_meas.db_read(self.meas.Iamb_id)
-                self.amb_cfg.db_read(self.amb_meas.cfg_id)
-                self.ambient_field_calculus(meas=meas)
+                self.ambient_field_calculus(meas)
             else:
                 self.ui.le_Imeas.setText('')
                 self.ui.le_Iamb.setText('')
@@ -277,6 +275,8 @@ class AnalysisWidget(_QWidget):
 
     def ambient_field_calculus(self, meas):
         """Discounts ambient field from measurement and prints results."""
+        self.amb_meas.db_read(meas.Iamb_id)
+        self.amb_cfg.db_read(self.amb_meas.cfg_id)
         _result = '{:.2f} +/- {:.2f}'.format(meas.I_mean*10**6,
                                              meas.I_std*10**6)
 

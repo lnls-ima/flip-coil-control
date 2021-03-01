@@ -6,47 +6,20 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>451</width>
-    <height>236</height>
+    <width>538</width>
+    <height>386</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Dialog</string>
   </property>
   <layout class="QGridLayout" name="gridLayout">
-   <item row="0" column="0">
-    <layout class="QHBoxLayout" name="horizontalLayout_2">
-     <item>
-      <widget class="QLabel" name="label">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>Measurement Name:</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QComboBox" name="cmb_meas_name">
-       <property name="editable">
-        <bool>true</bool>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
-   <item row="1" column="0">
-    <widget class="QLabel" name="label_2">
+   <item row="5" column="0">
+    <widget class="QCheckBox" name="chb_Iamb">
      <property name="text">
-      <string>Comments:</string>
+      <string>Ambient Field Measurement</string>
      </property>
     </widget>
-   </item>
-   <item row="2" column="0">
-    <widget class="QTextEdit" name="te_comments"/>
    </item>
    <item row="3" column="0">
     <layout class="QHBoxLayout" name="horizontalLayout_4">
@@ -69,20 +42,6 @@
      </item>
     </layout>
    </item>
-   <item row="4" column="0">
-    <widget class="QCheckBox" name="chb_auto_current">
-     <property name="text">
-      <string>Automatic Current Control</string>
-     </property>
-    </widget>
-   </item>
-   <item row="5" column="0">
-    <widget class="QCheckBox" name="chb_Iamb">
-     <property name="text">
-      <string>Ambient Field Measurement</string>
-     </property>
-    </widget>
-   </item>
    <item row="6" column="0">
     <layout class="QHBoxLayout" name="horizontalLayout_3">
      <item>
@@ -103,7 +62,34 @@
      </item>
     </layout>
    </item>
-   <item row="7" column="0">
+   <item row="0" column="0">
+    <layout class="QHBoxLayout" name="horizontalLayout_2">
+     <item>
+      <widget class="QLabel" name="label">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Maximum" vsizetype="Preferred">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="text">
+        <string>Measurement Name:</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLineEdit" name="le_meas_name"/>
+     </item>
+    </layout>
+   </item>
+   <item row="4" column="0">
+    <widget class="QCheckBox" name="chb_auto_current">
+     <property name="text">
+      <string>Automatic Current Control</string>
+     </property>
+    </widget>
+   </item>
+   <item row="9" column="0">
     <layout class="QHBoxLayout" name="horizontalLayout">
      <item>
       <spacer name="horizontalSpacer">
@@ -142,6 +128,143 @@
       </spacer>
      </item>
     </layout>
+   </item>
+   <item row="1" column="0">
+    <widget class="QLabel" name="label_2">
+     <property name="text">
+      <string>Comments:</string>
+     </property>
+    </widget>
+   </item>
+   <item row="8" column="0">
+    <layout class="QHBoxLayout" name="horizontalLayout_5">
+     <item>
+      <widget class="QComboBox" name="cmb_scan_param">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
+       <item>
+        <property name="text">
+         <string>X [µm]</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>Y [µm]</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>Speed [rev/s]</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>Acceleration [rev/s²]</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>Jerk [rev/s³]</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>Current [A]</string>
+        </property>
+       </item>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="label_5">
+       <property name="text">
+        <string>Start:</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QDoubleSpinBox" name="dsb_scan_start">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
+       <property name="decimals">
+        <number>3</number>
+       </property>
+       <property name="minimum">
+        <double>-100000.000000000000000</double>
+       </property>
+       <property name="maximum">
+        <double>100000.000000000000000</double>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="label_6">
+       <property name="text">
+        <string>End:</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QDoubleSpinBox" name="dsb_scan_end">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
+       <property name="decimals">
+        <number>3</number>
+       </property>
+       <property name="minimum">
+        <double>-100000.000000000000000</double>
+       </property>
+       <property name="maximum">
+        <double>100000.000000000000000</double>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="label_7">
+       <property name="text">
+        <string>Step:</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QDoubleSpinBox" name="dsb_scan_step">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
+       <property name="decimals">
+        <number>3</number>
+       </property>
+       <property name="minimum">
+        <double>-100000.000000000000000</double>
+       </property>
+       <property name="maximum">
+        <double>100000.000000000000000</double>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item row="7" column="0">
+    <widget class="QCheckBox" name="chb_scan">
+     <property name="text">
+      <string>Scan parameter:</string>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="0">
+    <widget class="QLineEdit" name="le_comments">
+     <property name="minimumSize">
+      <size>
+       <width>0</width>
+       <height>100</height>
+      </size>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
+     </property>
+    </widget>
    </item>
   </layout>
  </widget>
@@ -224,6 +347,70 @@
     <hint type="destinationlabel">
      <x>225</x>
      <y>159</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>chb_scan</sender>
+   <signal>clicked(bool)</signal>
+   <receiver>cmb_scan_param</receiver>
+   <slot>setEnabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>75</x>
+     <y>288</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>83</x>
+     <y>320</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>chb_scan</sender>
+   <signal>clicked(bool)</signal>
+   <receiver>dsb_scan_end</receiver>
+   <slot>setEnabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>268</x>
+     <y>309</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>353</x>
+     <y>334</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>chb_scan</sender>
+   <signal>clicked(bool)</signal>
+   <receiver>dsb_scan_start</receiver>
+   <slot>setEnabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>268</x>
+     <y>309</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>223</x>
+     <y>334</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>chb_scan</sender>
+   <signal>clicked(bool)</signal>
+   <receiver>dsb_scan_step</receiver>
+   <slot>setEnabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>268</x>
+     <y>309</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>484</x>
+     <y>334</y>
     </hint>
    </hints>
   </connection>
