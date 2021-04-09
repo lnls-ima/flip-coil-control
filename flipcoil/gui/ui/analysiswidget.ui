@@ -186,6 +186,28 @@
    <item row="0" column="0" colspan="5">
     <layout class="QHBoxLayout" name="horizontalLayout_2">
      <item>
+      <widget class="QRadioButton" name="rdb_sw">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="minimumSize">
+        <size>
+         <width>100</width>
+         <height>0</height>
+        </size>
+       </property>
+       <property name="text">
+        <string>Stretched Wire</string>
+       </property>
+       <property name="checked">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
       <widget class="QComboBox" name="cmb_meas_name">
        <property name="sizePolicy">
         <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
@@ -219,6 +241,25 @@
    </item>
    <item row="1" column="0" colspan="5">
     <layout class="QHBoxLayout" name="horizontalLayout">
+     <item>
+      <widget class="QRadioButton" name="rdb_fc">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Fixed" vsizetype="Maximum">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="minimumSize">
+        <size>
+         <width>100</width>
+         <height>0</height>
+        </size>
+       </property>
+       <property name="text">
+        <string>Flip Coil</string>
+       </property>
+      </widget>
+     </item>
      <item>
       <widget class="QComboBox" name="cmb_plot">
        <property name="sizePolicy">
@@ -260,6 +301,16 @@
        <item>
         <property name="text">
          <string>Forward/Backward Voltage</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>Forward Voltage FFT</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>Backward Voltage FFT</string>
         </property>
        </item>
        <item>

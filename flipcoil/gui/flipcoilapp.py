@@ -70,6 +70,9 @@ class FlipCoilApp(_QApplication):
         _MeasurementData = _data.measurement.MeasurementData(
             database_name=self.database_name,
             mongo=self.mongo, server=self.server)
+        _MeasurementDataSW = _data.measurement.MeasurementDataSW(
+            database_name=self.database_name,
+            mongo=self.mongo, server=self.server)
 
         status = []
 #         status.append(_ConnectionConfig.db_create_collection())
@@ -79,6 +82,7 @@ class FlipCoilApp(_QApplication):
         status.append(_PpmacConfig.db_create_collection())
         status.append(_MeasurementConfig.db_create_collection())
         status.append(_MeasurementData.db_create_collection())
+        status.append(_MeasurementDataSW.db_create_collection())
 
         if not all(status):
             raise Exception("Failed to create database.")

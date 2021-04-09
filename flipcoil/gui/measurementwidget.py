@@ -30,6 +30,8 @@ from flipcoil.devices import (
     ps as _ps,
     volt as _volt,
     )
+from pywin.framework import startup
+from numpy.distutils.system_info import accelerate_info
 
 
 class MeasurementWidget(_QWidget):
@@ -46,8 +48,11 @@ class MeasurementWidget(_QWidget):
         self.flag_rm_backlash = True
         self.flag_save = False
 
+        self.volt = _volt
+
         self.cfg = _data.configuration.MeasurementConfig()
         self.meas = _data.measurement.MeasurementData()
+        self.meas_sw = _data.measurement.MeasurementDataSW()
 
         self.update_cfg_list()
 #         self.load_cfg()
@@ -106,8 +111,12 @@ class MeasurementWidget(_QWidget):
         # Y1/2: CCW/CW M5 (0 a -pi)  M6 (0 a pi)
         # X1/2: CCW/CW M5 (pi/2 a -pi/2) M6 (-pi/2 a pi/2)
         try:
+            if self.ui.rdb_sw.isChecked():
+                raise RuntimeError
+
             _start_pos = int(self.ui.dsp_start_pos.value()*10**3)
             _ppmac.remove_backlash(_start_pos)
+#             _ppmac.align_motors(interval=3)
             _sleep(5)
             _frw_steps = [self.ui.sb_frw5.value(), self.ui.sb_frw6.value()]
             _bck_steps = [self.ui.sb_bck5.value(), self.ui.sb_bck6.value()]
@@ -160,7 +169,7 @@ class MeasurementWidget(_QWidget):
             self.cfg.max_init_error = (
                 self.motors.ui.sb_rot_max_err.value())
 
-            self.cfg.nplc = self.ui.sb_nplc.value()
+            self.cfg.nplc = self.ui.dsb_nplc.value()
             self.cfg.duration = self.ui.dsb_duration.value()
 
             self.cfg.width = self.ui.dsb_width.value() * 10**-3  # [m]
@@ -234,7 +243,7 @@ class MeasurementWidget(_QWidget):
             self.motors.ui.sb_rot_max_err.setValue(
                 self.cfg.max_init_error)
 
-            self.ui.sb_nplc.setValue(self.cfg.nplc)
+            self.ui.dsb_nplc.setValue(self.cfg.nplc)
             self.ui.dsb_duration.setValue(self.cfg.duration)
 
             self.ui.dsb_width.setValue(self.cfg.width * 10**3)  # [mm]
@@ -253,15 +262,20 @@ class MeasurementWidget(_QWidget):
         self.dialog.accepted.connect(self.start_measurement)
         self.dialog.rejected.connect(self.cancel_measurement)
 
+        if self.ui.rdb_sw.isChecked():
+            _meas = self.meas_sw
+        else:
+            _meas = self.meas
+
         try:
-            self.meas.db_update_database(self.database_name, mongo=self.mongo,
+            _meas.db_update_database(self.database_name, mongo=self.mongo,
                                          server=self.server)
-            last_id = self.meas.db_get_last_id()
+            last_id = _meas.db_get_last_id()
             name = '_'.join(
-                self.meas.db_get_value('name', last_id).split('_')[:-3])
+                _meas.db_get_value('name', last_id).split('_')[:1])
             self.dialog.ui.le_meas_name.setText(name)
 
-            comments = self.meas.db_get_value('comments', last_id)
+            comments = _meas.db_get_value('comments', last_id)
             self.dialog.ui.le_comments.setText(comments)
 #             _update_db_name_list(self.meas, self.dialog.ui.cmb_meas_name)
 #             self.meas.db_update_database(database_name=self.database_name,
@@ -276,11 +290,16 @@ class MeasurementWidget(_QWidget):
 
     def update_iamb_list(self):
         """Updates Iamb list on measurement dialog."""
-        self.meas.db_update_database(
+        if self.ui.rdb_sw.isChecked():
+            _meas = self.meas_sw
+        else:
+            _meas = self.meas
+
+        _meas.db_update_database(
             self.database_name,
             mongo=self.mongo, server=self.server)
 
-        self.dialog.amb_list = self.meas.db_search_field('Iamb_id', 0)
+        self.dialog.amb_list = _meas.db_search_field('Iamb_id', 0)
         self.dialog.ui.cmb_Iamb.addItems(
             [item['name'] for item in self.dialog.amb_list])
         self.dialog.ui.cmb_Iamb.setCurrentIndex(len(self.dialog.amb_list)-1)
@@ -296,30 +315,108 @@ class MeasurementWidget(_QWidget):
 
         try:
             self.update_cfg_from_ui()
+            _ppmac.flag_abort = False
+            if self.ui.rdb_sw.isChecked():
+                _meas = self.meas_sw
+                _meas.mode = 'sw'
+                _measure_first_integral = self.measure_first_intgral_sw
+
+                _meas.motion_axis = self.ui.cmb_motion_axis.currentText()
+                _meas.start_pos = self.ui.dsb_scan_start.value()  # [mm]
+                _meas.end_pos = self.ui.dsb_scan_end.value()  # [mm]
+                _meas.step = self.ui.dsb_scan_step.value()  # [mm]
+            else:
+                _meas = self.meas
+                _meas.mode = 'fc'
+                _measure_first_integral = self.measure_first_intgral
+
             scan_flag = self.dialog.ui.chb_scan.isChecked()
             repeats = self.dialog.ui.sb_repetitions.value()
+            _meas.turns = self.ui.sb_turns.value()
+            _meas.nplc = self.ui.dsb_nplc.value()
+            _meas.duration = self.ui.dsb_duration.value()
+            _meas.nmeasurements = self.ui.sb_nmeasurements.value()
 
             if not scan_flag:
                 # update meas.name and meas.comments
-                self.meas.comments = self.dialog.ui.le_comments.text()
+                _meas.comments = self.dialog.ui.le_comments.text()
 
                 # measure
+#                 if self.ui.rdb_sw.isChecked():
+#                     raise RuntimeError
+
                 for i in range(repeats):
+                    if _ppmac.flag_abort:
+                        _QMessageBox.information(self, 'Warning',
+                                                 'Measurement Aborted.',
+                                                 _QMessageBox.Ok)
+                        return False
                     name = self.dialog.ui.le_meas_name.text()
-                    name = (name + '_' + self.cfg.direction +
-                            _time.strftime('_%y%m%d_%H%M'))
-                    self.meas.hour = _time.strftime('%H:%M:%S')
-                    self.meas.name = name
-                    self.measure_first_integral()
+                    if _meas.mode == 'fc':
+                        name = (name + '_' + self.cfg.direction +
+                                _time.strftime('_%y%m%d_%H%M'))
+                    else:
+                        name = (name + _time.strftime('_%y%m%d_%H%M'))
+                    _meas.name = name
+                    _meas.hour = _time.strftime('%H:%M:%S')
+                    _measure_first_integral()
 
             if scan_flag:
                 param = self.dialog.ui.cmb_scan_param.currentText()
                 start = self.dialog.ui.dsb_scan_start.value()
                 end = self.dialog.ui.dsb_scan_end.value()
                 step = self.dialog.ui.dsb_scan_step.value()
-                n_steps = int(1 + _np.ceil((end-start)/step))  # number of steps
+                if step == 0:
+                    n_steps = 1
+                else:
+                    # number of steps
+                    n_steps = int(1 + _np.ceil((end-start)/step))
+
+#                 if _meas.mode == 'sw':
+#                     _meas.comments = self.dialog.ui.le_comments.text()
+#                     name = (self.dialog.ui.le_meas_name.text() +
+#                             _time.strftime('_%y%m%d_%H%M'))
+#                     _meas.name = name
+#                     _meas.hour = _time.strftime('%H:%M:%S')
+# 
+#                     _measure_first_integral()
+#                     _QMessageBox.information(self, 'Information',
+#                                              'Measurement Finished.',
+#                                              _QMessageBox.Ok)
+#                     return True
+
+                # get previous parameter
+                if 'X' in param:
+                    if _meas.mode == 'sw' and _meas.motion_axis == 'X':
+                        _QMessageBox.information(self, 'Warning',
+                                                 'Motion axis and scan axis '
+                                                 'must not be the same.\n'
+                                                 'Measurement Aborted.',
+                                                 _QMessageBox.Ok)
+                        return False
+                    previous_param = self.motors.ui.dsb_pos_x.value()
+                elif 'Y' in param:
+                    if _meas.mode == 'sw' and _meas.motion_axis == 'Y':
+                        _QMessageBox.information(self, 'Warning',
+                                                 'Motion axis and scan axis '
+                                                 'must not be the same.\n'
+                                                 'Measurement Aborted.',
+                                                 _QMessageBox.Ok)
+                        return False
+                    previous_param = self.motors.ui.dsb_pos_y.value()
+                elif 'Speed' in param:
+                    previous_param = self.cfg.speed
+                elif 'Acceleration' in param:
+                    previous_param = self.cfg.accel
+                elif 'Jerk' in param:
+                    previous_param = self.cfg.jerk
 
                 for i in range(n_steps):
+                    if _ppmac.flag_abort:
+                        _QMessageBox.information(self, 'Warning',
+                                                 'Measurement Aborted.',
+                                                 _QMessageBox.Ok)
+                        return False
                     # change setpoint
                     setpoint = start + i * step
                     if i == n_steps - 1:
@@ -327,8 +424,8 @@ class MeasurementWidget(_QWidget):
 
                     if 'X' in param:
                         p_str = '_X={0:.2f}_'.format(setpoint)
-                        _x_lim = [self.ui.dsb_min_x.value()*10**3,
-                                  self.ui.dsb_max_x.value()*10**3]
+                        _x_lim = [self.motors.ui.dsb_min_x.value()*10**3,
+                                  self.motors.ui.dsb_max_x.value()*10**3]
                         if _x_lim[0] <= setpoint <= _x_lim[1]:
                             self.motors.ui.dsb_pos_x.setValue(setpoint)
                             self.motors.move_xy()
@@ -338,10 +435,10 @@ class MeasurementWidget(_QWidget):
                                                      'X out of range.',
                                                      _QMessageBox.Ok)
                             raise ValueError
-                    if 'Y' in param:
+                    elif 'Y' in param:
                         p_str = '_Y={0:.2f}_'.format(setpoint)
-                        _y_lim = [self.ui.dsb_min_y.value()*10**3,
-                                  self.ui.dsb_max_y.value()*10**3]
+                        _y_lim = [self.motors.ui.dsb_min_y.value()*10**3,
+                                  self.motors.ui.dsb_max_y.value()*10**3]
                         if _y_lim[0] <= setpoint <= _y_lim[1]:
                             self.motors.ui.dsb_pos_y.setValue(setpoint)
                             self.motors.move_xy()
@@ -351,16 +448,16 @@ class MeasurementWidget(_QWidget):
                                                      'Y out of range.',
                                                      _QMessageBox.Ok)
                             raise ValueError
-                    if 'Speed' in param:
+                    elif 'Speed' in param:
                         p_str = '_Spd={0:.2f}_'.format(setpoint)
                         self.cfg.speed = setpoint
-                    if 'Acceleration' in param:
+                    elif 'Acceleration' in param:
                         p_str = '_Acc={0:.2f}_'.format(setpoint)
                         self.cfg.accel = setpoint
-                    if 'Jerk' in param:
+                    elif 'Jerk' in param:
                         p_str = '_Jrk={0:.2f}_'.format(setpoint)
                         self.cfg.jerk = setpoint
-                    if 'Current' in param:
+                    elif 'Current' in param:
                         p_str = '_I={0:.2f}_'.format(setpoint)
                         if self.ps.ps.read_ps_onoff():
                             self.ps.ui.dsb_current_setpoint.setValue(setpoint)
@@ -385,19 +482,30 @@ class MeasurementWidget(_QWidget):
                     # update meas.name, meas.comments:
                     comments = self.dialog.ui.le_comments.text()
                     comments = comments + ' Scan: ' + p_str.strip('_') + '.'
-                    self.meas.comments = comments
+                    _meas.comments = comments
 
                     # measure
                     for i in range(repeats):
                         name = self.dialog.ui.le_meas_name.text()
                         name = (name + '_' + self.cfg.direction + p_str +
                                 _time.strftime('_%y%m%d_%H%M'))
-                        self.meas.hour = _time.strftime('%H:%M:%S')
-                        self.meas.name = name
+                        _meas.hour = _time.strftime('%H:%M:%S')
+                        _meas.name = name
 
-                        self.measure_first_integral()
+                        _measure_first_integral()
 
-                if 'Current' in param:
+                # set previous parameter
+#                 if 'X' in param:
+#                     self.motors.ui.dsb_pos_x.setValue(previous_param)
+#                 elif 'Y' in param:
+#                     self.motors.ui.dsb_pos_y.setValue(previous_param)
+                if 'Speed' in param:
+                    self.cfg.speed = previous_param
+                elif 'Acceleration' in param:
+                    self.cfg.accel = previous_param
+                elif 'Jerk' in param:
+                    self.cfg.jerk = previous_param
+                elif 'Current' in param:
                     self.ps.ui.dsb_current_setpoint.setValue(setpoint)
                     self.ps.ps.set_slowref(setpoint)
                     _sleep(5)
@@ -415,6 +523,179 @@ class MeasurementWidget(_QWidget):
                                      _QMessageBox.Ok)
             return False
 
+    def measure_first_intgral_sw(self):
+        """Runs first field integral measurement in stretched wire mode."""
+        try:
+            _meas = self.meas_sw
+            if self.dialog.ui.chb_Iamb.isChecked():
+                self.meas_sw.Iamb_id = 0
+            else:
+                _id = self.dialog.ui.cmb_Iamb.currentIndex()
+                self.meas_sw.Iamb_id = self.dialog.amb_list[_id]['id']
+#             turns = self.ui.sb_turns.value()
+#             nplc = self.ui.dsb_nplc.value()
+#             duration = self.ui.dsb_duration.value()
+#             nmeasurements = self.ui.sb_nmeasurements.value()
+#             self.meas.cfg_id = self.ui.cmb_cfg_name.currentIndex() + 1
+            ##Teste manual
+#             start = self.dialog.ui.dsb_scan_start.value()  # [mm]
+#             end = self.dialog.ui.dsb_scan_end.value()  # [mm]
+#             step = self.dialog.ui.dsb_scan_step.value()  # [mm]
+#             param = self.dialog.ui.cmb_scan_param.currentText()
+#             self.meas_sw.mode = 'sw'
+#             self.meas_sw.turns = turns
+            motion_axis = self.meas_sw.motion_axis
+            nmeasurements = self.meas_sw.nmeasurements
+            nplc = self.meas_sw.nplc
+            duration = self.meas_sw.duration
+            start = self.meas_sw.start_pos
+            end = self.meas_sw.end_pos
+            step = self.meas_sw.step
+
+            # PPMAC configurations
+            ppmac_cfg = self.motors.cfg
+            if motion_axis == 'X':
+                speed = ppmac_cfg.speed_x  # [mm/s]
+                accel = ppmac_cfg.accel_x  # [mm/s^2]
+                jerk = ppmac_cfg.jerk_x  # [mm/s^3]
+                _ppmac.write('#2,4,5,6k')
+                _ppmac.write('#1,3j/')
+                move_axis = self.motors.move_x
+            elif motion_axis == 'Y':
+                speed = ppmac_cfg.speed_y  # [mm/s]
+                accel = ppmac_cfg.accel_y  # [mm/s^2]
+                jerk = ppmac_cfg.jerk_y  # [mm/s^3]
+                _ppmac.write('#1,3,5,6k')
+                _ppmac.write('#2,4j/')
+                move_axis = self.motors.move_y
+            self.motors.configure_ppmac()
+
+            self.meas_sw.speed = speed
+            self.meas_sw.accel = accel
+            self.meas_sw.jerk = jerk
+
+            if end < start:
+                _QMessageBox.information(self, 'Warning',
+                                         'End position should be greater than '
+                                         'start position.\n'
+                                         'Measurement Aborted.',
+                                         _QMessageBox.Ok)
+                return False
+            elif start == end:
+                n_steps = 1
+                self.meas_sw.transversal_pos = _np.array([start])
+            else:
+                if (end - start) < step:
+                    self.meas_sw.transversal_pos = _np.array([start, end])
+                else:
+                    # number of steps
+                    n_steps = int(1 + _np.ceil((end-start) / step))
+                    # warning if n_steps is not an integer?
+                    # check if start and end pos are inside limits
+                    self.meas_sw.transversal_pos = _np.linspace(start, end,
+                                                                n_steps)
+
+            _prg_dialog = _QProgressDialog('Measurement', 'Abort', 0,
+                                           nmeasurements + 1, self)
+            _prg_dialog.setWindowTitle('Measurement Progress')
+            _prg_dialog.show()
+            _QApplication.processEvents()
+
+            data_frw = []
+            data_bck = []
+
+            self.motors.timer.stop()
+
+            _sleep(1)
+
+            counts = int(_np.ceil(3/(self.meas_sw.nplc/60)))
+            _volt.configure_volt(nplc=nplc, time=duration)
+            _sleep(0.5)
+
+            _prg_dialog.setValue(0)
+
+            for pos in self.meas_sw.transversal_pos:
+                _init_pos = pos - step/2  # [mm]
+                _end_pos = pos + step/2  # [mm]
+                data_frw_aux = _np.array([])
+                data_bck_aux = _np.array([])
+
+                for i in range(self.meas_sw.nmeasurements):
+                    if _prg_dialog.wasCanceled():
+                        _prg_dialog.destroy()
+                        _ppmac.flag_abort = True
+                        return False
+
+                    # Forward measurement
+                    # go to init pos
+                    move_axis(_init_pos)
+                    _sleep(3)  # wait vibrations damping
+                    _volt.start_measurement()
+                    _t0 = _time.time()
+                    _sleep(1)
+                    # move step
+                    move_axis(_end_pos)
+                    _sleep(3)
+
+                    if _time.time() - _t0 <= duration + 1:
+                        _sleep(duration + 1 + _t0 - _time.time())
+
+                    _data = _volt.get_readings_from_memory(5)[::-1]
+                    if i == 0:
+                        data_frw_aux = _np.append(data_frw_aux, _data)
+                    else:
+                        data_frw_aux = _np.vstack([data_frw_aux, _data])
+
+                    _sleep(3)
+
+                    # Backward measurement
+                    _volt.start_measurement()
+                    _t0 = _time.time()
+                    _sleep(1)
+                    # move - step
+                    move_axis(_init_pos)
+                    _sleep(3)
+
+                    if _time.time() - _t0 <= duration + 1:
+                        _sleep(duration + 1 + _t0 - _time.time())
+
+                    _data = _volt.get_readings_from_memory(5)[::-1]
+
+                    if i == 0:
+                        data_bck_aux = _np.append(data_bck_aux, _data)
+                    else:
+                        data_bck_aux = _np.vstack([data_bck_aux, _data])
+                    _prg_dialog.setValue(i+1)
+
+                data_frw.append(data_frw_aux.transpose())
+                data_bck.append(data_bck_aux.transpose())
+
+            # data[i, j, k]
+            # i: position index
+            # j: measurement voltage array index
+            # k: measurement number index
+            self.meas_sw.data_frw = _np.array(data_frw)
+            self.meas_sw.data_bck = _np.array(data_bck)
+
+            # data analisys
+            self.analysis.first_integral_calculus_sw(self.meas_sw)
+            self.save_sw_measurement()
+            self.analysis.update_meas_list()
+            _count = self.analysis.cmb_meas_name.count() - 1
+            self.analysis.cmb_meas_name.setCurrentIndex(_count)
+
+            self.motors.timer.start(1000)
+            _prg_dialog.destroy()
+            return True
+
+        except Exception:
+            _traceback.print_exc(file=_sys.stdout)
+            _QMessageBox.information(self, 'Warning',
+                                     'Measurement Failed.',
+                                     _QMessageBox.Ok)
+            self.motors.timer.start(1000)
+            return False
+
     def measure_first_integral(self, fdi_mode=False):
         """Runs first field integral measurement.
 
@@ -423,7 +704,7 @@ class MeasurementWidget(_QWidget):
             False otherwise.
         """
         try:
-            _ppmac.flag_abort = False
+#             _ppmac.flag_abort = False
 #             self.update_cfg_from_ui()
 
 #             self.meas.comments = self.dialog.ui.te_comments.toPlainText()
@@ -539,7 +820,7 @@ class MeasurementWidget(_QWidget):
                 self.meas.pos7f[1, i], self.meas.pos8f[1, i] = (
                     _ppmac.read_motor_pos([7, 8]))
 
-                _sleep(10)
+                _sleep(5)
 
                 if fdi_mode:
                     _fdi.start_measurement()
@@ -617,6 +898,22 @@ class MeasurementWidget(_QWidget):
                         mongo=self.mongo, server=self.server)
             self.meas.db_save()
             self.analysis.update_meas_list()
+            return True
+        except Exception:
+            _QMessageBox.warning(self, 'Information',
+                                 'Failed to save this measurement.',
+                                 _QMessageBox.Ok)
+            _traceback.print_exc(file=_sys.stdout)
+            return False
+
+    def save_sw_measurement(self):
+        """Saves current measurement into database."""
+        try:
+            self.meas_sw.db_update_database(
+                        self.database_name,
+                        mongo=self.mongo, server=self.server)
+            self.meas_sw.db_save()
+#             self.analysis.update_meas_list()
             return True
         except Exception:
             _QMessageBox.warning(self, 'Information',

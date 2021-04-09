@@ -99,10 +99,10 @@ class PpmacWidget(_QWidget):
                 if all([not _ppmac.ppmac.closed,
                         self.parent().currentWidget() == self]):
                     self.pos = _ppmac.read_motor_pos([1, 2, 3, 4, 7, 8])
-                    self.ui.lcd_pos1.display(self.pos[0]*self.cfg.x_sf*10**3)
-                    self.ui.lcd_pos2.display(self.pos[1]*self.cfg.y_sf*10**3)
-                    self.ui.lcd_pos3.display(self.pos[2]*self.cfg.x_sf*10**3)
-                    self.ui.lcd_pos4.display(self.pos[3]*self.cfg.y_sf*10**3)
+                    self.ui.lcd_pos1.display(self.pos[0]*self.cfg.x_sf)
+                    self.ui.lcd_pos2.display(self.pos[1]*self.cfg.y_sf)
+                    self.ui.lcd_pos3.display(self.pos[2]*self.cfg.x_sf)
+                    self.ui.lcd_pos4.display(self.pos[3]*self.cfg.y_sf)
                     self.ui.lcd_pos5.display(self.pos[4]*self.angular_sf)
                     self.ui.lcd_pos6.display(self.pos[5]*self.angular_sf)
                     _QApplication.processEvents()
@@ -268,7 +268,7 @@ class PpmacWidget(_QWidget):
             if self.cfg.jerk_y != 0:
                 _ts_y = (-1/self.cfg.jerk_y)*self.cfg.y_sf*10**9
             else:
-                _ta_y = 0
+                _ts_y = 0
 
             self.timer.stop()
             # Configures rotation motors:
@@ -297,7 +297,7 @@ class PpmacWidget(_QWidget):
             for i in [2, 4]:
                 msg = ('Motor[{0}].JogSpeed={1};'
                        'Motor[{0}].JogTa={2};'
-                       'Motor[{0}].JogTs={3}'.format(i, _spd_x, _ta_x, _ts_x))
+                       'Motor[{0}].JogTs={3}'.format(i, _spd_y, _ta_y, _ts_y))
 #                 with _ppmac.lock_ppmac:
                 _ppmac.write(msg)
                 self.timer.start(1000)
@@ -399,18 +399,106 @@ class PpmacWidget(_QWidget):
             _traceback.print_exc(file=_sys.stdout)
             self.timer.start(1000)
 
+    def move_x(self, position, absolute=True):
+        """Move X motors and returns only after they stop.
+
+        Args:
+            position (float): desired position in [mm];
+            absolute (bool): True for absolute positioning;
+                             False for relative positioning.
+        Returns:
+            True if successfull;
+            False otherwise."""
+        try:
+            _x_lim = [self.ui.dsb_min_x.value(),
+                      self.ui.dsb_max_x.value()]  # [mm]
+            _pos_x = position  # [mm] *10**-3/self.cfg.x_sf
+
+            if _x_lim[0] <= _pos_x <= _x_lim[1]:
+                _pos_x = _pos_x/self.cfg.x_sf
+            else:
+                _QMessageBox.warning(self, 'Information',
+                                     'X position out of range.',
+                                     _QMessageBox.Ok)
+                return False
+
+            if absolute:
+                _mode = '='
+            else:
+                _mode = '^'
+
+            self.timer.stop()
+            _ppmac.write('#1,3j/')
+            _msg_x = '#1,3j' + _mode + str(_pos_x)
+            _ppmac.write(_msg_x)
+            _sleep(0.2)
+            while (not all([self.ppmac.motor_stopped(1),
+                            self.ppmac.motor_stopped(3)])):
+                _sleep(0.2)
+            self.timer.start(1000)
+
+            return True
+        except Exception:
+            _traceback.print_exc(file=_sys.stdout)
+            self.timer.start(1000)
+            return False
+
+    def move_y(self, position, absolute=True):
+        """Move Y motors and returns only after they stop.
+
+        Args:
+            position (float): desired position in [mm];
+            absolute (bool): True for absolute positioning;
+                             False for relative positioning.
+        Returns:
+            True if successfull;
+            False otherwise."""
+        try:
+            _y_lim = [self.ui.dsb_min_y.value(),
+                      self.ui.dsb_max_y.value()]  # [mm]
+            _pos_y = position  # [mm] *10**-3/self.cfg.y_sf
+
+            if _y_lim[0] <= _pos_y <= _y_lim[1]:
+                _pos_y = _pos_y/self.cfg.y_sf
+            else:
+                _QMessageBox.warning(self, 'Information',
+                                     'Y position out of range.',
+                                     _QMessageBox.Ok)
+                return False
+
+            if absolute:
+                _mode = '='
+            else:
+                _mode = '^'
+
+            self.timer.stop()
+            _ppmac.write('#2,4j/')
+            _msg_y = '#2,4j' + _mode + str(_pos_y)
+            _ppmac.write(_msg_y)
+            _sleep(0.2)
+            while (not all([self.ppmac.motor_stopped(2),
+                            self.ppmac.motor_stopped(4)])):
+                _sleep(0.2)
+            self.timer.start(1000)
+
+            return True
+        except Exception:
+            _traceback.print_exc(file=_sys.stdout)
+            self.timer.start(1000)
+            return False
+
     def move_xy(self):
         """Move X and Y motors."""
         try:
-            _x_lim = [self.ui.dsb_min_x.value()*10**3,
-                      self.ui.dsb_max_x.value()*10**3]
-            _y_lim = [self.ui.dsb_min_y.value()*10**3,
-                      self.ui.dsb_max_y.value()*10**3]
+            _x_lim = [self.ui.dsb_min_x.value(),
+                      self.ui.dsb_max_x.value()]
+            _y_lim = [self.ui.dsb_min_y.value(),
+                      self.ui.dsb_max_y.value()]
             _pos_x = self.ui.dsb_pos_x.value()  # *10**-3/self.cfg.x_sf
             _pos_y = self.ui.dsb_pos_y.value()  # *10**-3/self.cfg.y_sf
 
             if _x_lim[0] <= _pos_x <= _x_lim[1]:
-                _pos_x = _pos_x*10**-3/self.cfg.x_sf
+                _pos_x = _pos_x/self.cfg.x_sf
             else:
                 _QMessageBox.warning(self, 'Information',
                                      'X position out of range.',
@@ -418,7 +506,7 @@ class PpmacWidget(_QWidget):
                 return False
 
             if _y_lim[0] <= _pos_y <= _y_lim[1]:
-                _pos_y = _pos_y*10**-3/self.cfg.y_sf
+                _pos_y = _pos_y/self.cfg.y_sf
             else:
                 _QMessageBox.warning(self, 'Information',
                                      'Y position out of range.',

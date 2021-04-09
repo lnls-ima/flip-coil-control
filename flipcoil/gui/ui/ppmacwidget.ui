@@ -86,7 +86,11 @@
          </widget>
         </item>
         <item row="2" column="1">
-         <widget class="QDoubleSpinBox" name="dsb_jerk"/>
+         <widget class="QDoubleSpinBox" name="dsb_jerk">
+          <property name="maximum">
+           <double>9999.000000000000000</double>
+          </property>
+         </widget>
         </item>
         <item row="5" column="1">
          <widget class="QSpinBox" name="sb_rot_max_err">
@@ -341,6 +345,9 @@
           </item>
           <item row="1" column="2">
            <widget class="QDoubleSpinBox" name="dsb_pos_y">
+            <property name="decimals">
+             <number>3</number>
+            </property>
             <property name="minimum">
              <double>-999999.000000000000000</double>
             </property>
@@ -352,14 +359,14 @@
           <item row="0" column="1">
            <widget class="QLabel" name="label_4">
             <property name="text">
-             <string>X Position [µm]:</string>
+             <string>X Position [mm]:</string>
             </property>
            </widget>
           </item>
           <item row="2" column="2">
            <widget class="QPushButton" name="pbt_move_xy">
             <property name="text">
-             <string>Move</string>
+             <string>Move XY</string>
             </property>
            </widget>
           </item>
@@ -379,12 +386,15 @@
           <item row="1" column="1">
            <widget class="QLabel" name="label_6">
             <property name="text">
-             <string>Y Position [µm]:</string>
+             <string>Y Position [mm]:</string>
             </property>
            </widget>
           </item>
           <item row="0" column="2">
            <widget class="QDoubleSpinBox" name="dsb_pos_x">
+            <property name="decimals">
+             <number>3</number>
+            </property>
             <property name="minimum">
              <double>-999999.000000000000000</double>
             </property>
@@ -431,6 +441,20 @@
            <widget class="QPushButton" name="pbt_home_y">
             <property name="text">
              <string>Home Y</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="3">
+           <widget class="QPushButton" name="pbt_move_x">
+            <property name="text">
+             <string>Move X</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="4">
+           <widget class="QPushButton" name="pbt_move_y">
+            <property name="text">
+             <string>Move Y</string>
             </property>
            </widget>
           </item>
@@ -482,7 +506,7 @@
         <item row="1" column="1">
          <widget class="QDoubleSpinBox" name="dsb_accel_x">
           <property name="value">
-           <double>20.000000000000000</double>
+           <double>40.000000000000000</double>
           </property>
          </widget>
         </item>
@@ -556,7 +580,7 @@
            <double>0.100000000000000</double>
           </property>
           <property name="value">
-           <double>2.000000000000000</double>
+           <double>10.000000000000000</double>
           </property>
          </widget>
         </item>
@@ -813,7 +837,7 @@
         </font>
        </property>
        <property name="text">
-        <string>Y positions [µm]:</string>
+        <string>Y positions [mm]:</string>
        </property>
       </widget>
      </item>
@@ -839,7 +863,7 @@
         </font>
        </property>
        <property name="text">
-        <string>X positions [µm]:</string>
+        <string>X positions [mm]:</string>
        </property>
       </widget>
      </item>

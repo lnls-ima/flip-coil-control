@@ -258,6 +258,8 @@ class Ppmac(Ppmac_eth):
             while(any([abs(-1*target_pos - p_list[-2]) > lim,
                        abs(target_pos - p_list[-1]) > lim]) and
                        n_tries < max_tries):
+                if self.flag_abort:
+                    return False
                 dp5 = dp5 + ccw*int((-1*target_pos - p_list[-2])*102400/360000)
                 dp6 = dp6 + ccw*int((target_pos - p_list[-1])*102400/360000)
                 self.write('#5j=' + str(ccw*(dp + -1*target_pos_steps)) +
@@ -272,7 +274,7 @@ class Ppmac(Ppmac_eth):
                 while not self.motor_stopped(5):
                     _sleep(0.1)
                 _sleep(1)
-                p_list = self.read_motor_pos([5, 6, 7, 8])
+                p_list = _np.floor(self.read_motor_pos([5, 6, 7, 8]))
                 n_tries = n_tries + 1
 
             if n_tries < max_tries:
@@ -285,47 +287,59 @@ class Ppmac(Ppmac_eth):
             _traceback.print_exc(file=_sys.stdout)
             return None
 
-    def align_motors(self, limit=2, max_tries=100):
+    def align_motors(self, limit=2, max_tries=100, bck_stps=200,
+                     stp_factor=0.7,  interval=3):
         try:
             sf = 102400/360000  # [steps/mdeg]
     #         limit = cfg.max_pos_error
             p_list = self.read_motor_pos([7, 8])
-            steps = _np.array([1000, -1000]) - 1*sf*p_list
-            self.write('#5j^{0};#6j^{1}'.format(steps))
+            # volta 1000 passos antes do zero
+            steps = _np.array([bck_stps, -1*bck_stps]) - 1*sf*p_list
+            self.write('#5j^{0};#6j^{1}'.format(steps[0], steps[1]))
             _sleep(0.1)
             while not self.motor_stopped(5):
                 _sleep(0.1)
+            _sleep(interval)
             p_list = self.read_motor_pos([7, 8])
             p_sign_init = _np.sign(p_list)
+            in_pos = [False, False]
 
-            while all([not -1*limit <= p_list[0] <= limit,
-                       not -1*limit <= p_list[1] <= limit,
-                       max_tries > 0]):
-                max_tries -= 1
+            tries = max_tries
+            # repete rotina enquanto não estiver na posição
+            while all([not in_pos[0] or not in_pos[1], tries > 0]):
+                tries -= 1
                 p_list = self.read_motor_pos([7, 8])
-                steps = -1*sf*p_list
+                steps = _np.floor(-1*sf*p_list*stp_factor)
                 for i in range(len(steps)):
-                    if steps[i] < 5:
-                        steps[i] = 1
-                self.write('#5j^{0};#6j^{1}'.format(steps))
+                    if abs(steps[i]) < 5 and steps[i] != 0:
+                        steps[i] = int(steps[i]/abs(steps[i]))
+                self.write('#5j^{0};#6j^{1}'.format(steps[0], steps[1]))
                 _sleep(0.1)
-                while not self.motor_stopped(5):
+                while all([not self.motor_stopped(5),
+                           not self.motor_stopped(6)]):
                     _sleep(0.1)
-                _sleep(1)
+                _time.sleep(interval)
                 p_list = self.read_motor_pos([7, 8])
                 p_sign = _np.sign(p_list)
+                sign_changed = not all(_np.equal(p_sign, p_sign_init))
+                if -1*limit <= p_list[0] <= limit:
+                    in_pos[0] = True
+                if -1*limit <= p_list[1] <= limit:
+                    in_pos[1] = True
                 if all([not -1*limit <= p_list[0] <= limit,
                         not -1*limit <= p_list[1] <= limit,
-                        not p_sign == p_sign_init]):
-                    steps = _np.array([1000, -1000]) - 1*sf*p_list
-                    self.write('#5j^{0};#6j^{1}'.format(steps))
+                        sign_changed]):
+                    steps = _np.array([bck_stps, -1*bck_stps]) - 1*sf*p_list
+                    self.write('#5j^{0};#6j^{1}'.format(steps[0], steps[1]))
                     _sleep(0.1)
-                    while not self.motor_stopped(5):
+                    while all([not self.motor_stopped(5),
+                               not self.motor_stopped(6)]):
                         _sleep(0.1)
+                    _sleep(3)
                     p_list = self.read_motor_pos([7, 8])
                     p_sign_init = _np.sign(p_list)
 
-            if max_tries > 0:
+            if tries > 0:
                 return True
             else:
                 return False
